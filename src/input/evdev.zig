@@ -16,6 +16,22 @@ fn eviocgbit(ev: u32, len: u32) u32 {
 fn eviocgname(len: u32) u32 {
     return lx.ior('E', 0x06, len);
 }
+fn eviocgid() u32 {
+    return lx.ior('E', 0x02, @sizeOf(InputId));
+}
+
+const InputId = extern struct { bustype: u16, vendor: u16, product: u16, version: u16 };
+const BUS_VIRTUAL: u16 = 0x06;
+
+/// True for uinput/virtual devices (ydotoold's, and zclicker's own passthrough/output
+/// nodes). The multi-device scan skips these so it never grabs or reads a synthetic
+/// device — which would otherwise capture our own passthrough and freeze the mouse.
+fn deviceIsVirtual(fd: std.posix.fd_t) bool {
+    var id: InputId = undefined;
+    const rc = std.os.linux.ioctl(fd, eviocgid(), @intFromPtr(&id));
+    if (@as(isize, @bitCast(rc)) < 0) return false; // can't tell → treat as real
+    return id.bustype == BUS_VIRTUAL;
+}
 
 /// One opened input device that holds at least one configured trigger code.
 const Device = struct {
@@ -67,6 +83,7 @@ pub const LinuxEvdev = struct {
             var zbuf: [256]u8 = undefined;
             const pz = std.fmt.bufPrintSentinel(&zbuf, "{s}", .{path}, 0) catch return error.OpenFailed;
             const fd = try lx.openRdonlyNonblock(pz);
+            errdefer lx.closeFd(fd); // addDevice only ungrabs on error; caller owns the fd
             try self.addDevice(fd);
         } else {
             self.scanDevices();
@@ -102,11 +119,11 @@ pub const LinuxEvdev = struct {
             var pathbuf: [32]u8 = undefined;
             const path = std.fmt.bufPrintSentinel(&pathbuf, "/dev/input/event{d}", .{n}, 0) catch continue;
             const fd = lx.openRdonlyNonblock(path) catch continue;
-            if (deviceHasAnyCode(fd, self.codes)) {
-                self.addDevice(fd) catch lx.closeFd(fd);
-            } else {
+            if (deviceIsVirtual(fd) or !deviceHasAnyCode(fd, self.codes)) {
                 lx.closeFd(fd);
+                continue;
             }
+            self.addDevice(fd) catch lx.closeFd(fd);
         }
     }
 
@@ -257,7 +274,7 @@ pub const LinuxEvdev = struct {
             const path = std.fmt.bufPrintSentinel(&pathbuf, "/dev/input/event{d}", .{n}, 0) catch continue;
             const fd = lx.openRdonlyNonblock(path) catch continue;
             defer lx.closeFd(fd);
-            if (!deviceHasAnyCode(fd, codes)) continue;
+            if (deviceIsVirtual(fd) or !deviceHasAnyCode(fd, codes)) continue;
             var namebuf: [256]u8 = undefined;
             const nm = nameInto(fd, &namebuf);
             const name: []const u8 = if (nm == 0) "(desconhecido)" else namebuf[0..nm];
