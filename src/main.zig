@@ -125,7 +125,7 @@ fn ydotoolSocketExists() bool {
 
 fn printUsage() void {
     std.debug.print(
-        \\zclicker - autoclicker (segure botão 4/5 do mouse pra clicar com o esquerdo)
+        \\zclicker - autoclicker (segure/alterna nos botões-gatilho pra clicar)
         \\
         \\uso: zclicker [opções]
         \\  -i, --interval <ms>    intervalo entre cliques (padrão 50)
