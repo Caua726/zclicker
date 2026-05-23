@@ -49,6 +49,19 @@ zig build              # binário em zig-out/bin/zclicker
 zig build test         # roda os testes
 ```
 
+### Windows
+
+```sh
+zig build -Dtarget=x86_64-windows   # gera zig-out/bin/zclicker.exe
+```
+
+O engine de Windows usa um hook de mouse low-level (`WH_MOUSE_LL`) pros gatilhos
+e `SendInput` pra clicar — os botões do mouse (left/right/middle/4/5) são
+mapeados pro mesmo espaço de códigos evdev, então `--buttons`, `--mode`, `-i`,
+`--click` e `--suppress` funcionam igual. Gatilhos de teclado ainda são um TODO.
+Compila e linka via cross-compile no Linux, mas **ainda não foi testado** num
+Windows de verdade.
+
 ## GUI
 
 Janela nativa **GTK4** embutida no próprio binário `zclicker`. Quando compilado
@@ -138,6 +151,11 @@ src/
   output/
     uinput.zig          clica via /dev/uinput (sem daemon)
     ydotool.zig         clica via `ydotool click 0xC0`
+  windows/
+    win32.zig           bindings Win32 (WH_MOUSE_LL, SendInput)
+    input.zig           hook de mouse low-level -> fila -> nextEvent
+    output.zig          clica via SendInput
+    run.zig             monta os backends de Windows e roda o loop
 ```
 
 O loop é **single-thread**: o tempo entre cliques vem do timeout do `poll()`, sem
@@ -148,4 +166,5 @@ threads nem locks.
 1. ~~**Supressão de navegação** — capturar o mouse (`EVIOCGRAB`) e re-injetar tudo
    via `uinput` menos os botões 4/5, pra eles não dispararem voltar/avançar.~~ ✅ feito
 2. ~~**X11** — backend de saída via XTest.~~ ✅ feito
-3. **Windows** — input via Raw Input, saída via `SendInput`.
+3. ~~**Windows** — input via hook de mouse low-level (`WH_MOUSE_LL`), saída via
+   `SendInput`.~~ ✅ feito (gatilhos de mouse; teclado é TODO; ainda não testado)
