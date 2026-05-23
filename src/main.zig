@@ -27,7 +27,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
 
-    var evdev = z.LinuxEvdev.init(cfg.device, cfg.buttonCodes()) catch |err| {
+    var evdev = z.LinuxEvdev.init(cfg.device, cfg.buttonCodes(), cfg.suppress) catch |err| {
         switch (err) {
             error.NoDeviceFound => std.debug.print(
                 "nenhum mouse com botões laterais encontrado. tente --list ou --device.\n",

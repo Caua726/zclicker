@@ -1,12 +1,17 @@
 const std = @import("std");
 const backend = @import("../backend.zig");
+const lx = @import("../platform/linux.zig");
 
 const InputBackend = backend.InputBackend;
 const TriggerEvent = backend.TriggerEvent;
 
 const EV_KEY: u16 = 0x01;
+const EV_MSC: u16 = 0x04;
 const KEY_MAX: usize = 0x2ff;
 const MAX_EVENT_NODES: usize = 64;
+
+/// EVIOCGRAB: grab/release exclusive access to the device. arg 1 grabs, 0 releases.
+const EVIOCGRAB = lx.iow('E', 0x90, @sizeOf(c_int));
 
 /// evdev `struct input_event` on 64-bit Linux (sizeof == 24).
 const InputEvent = extern struct {
@@ -74,25 +79,48 @@ pub const LinuxEvdev = struct {
     pending: [64]TriggerEvent = undefined,
     pending_len: usize = 0,
     pending_idx: usize = 0,
+    codes: []const u16 = &.{},
+    suppress: bool = false,
+    passthrough_fd: std.posix.fd_t = -1,
 
-    pub fn init(device: ?[]const u8, codes: []const u16) !LinuxEvdev {
-        var self = LinuxEvdev{ .fd = -1 };
+    pub fn init(device: ?[]const u8, codes: []const u16, suppress: bool) !LinuxEvdev {
+        var self = LinuxEvdev{ .fd = -1, .codes = codes, .suppress = suppress };
         self.fd = if (device) |path| blk: {
             var zbuf: [256]u8 = undefined;
             const pz = std.fmt.bufPrintSentinel(&zbuf, "{s}", .{path}, 0) catch return error.OpenFailed;
             break :blk try openDevice(pz);
         } else try findDevice(codes);
+        errdefer closeFd(self.fd);
         self.name_len = nameInto(self.fd, &self.name_buf);
+
+        if (suppress) {
+            // Grab the physical device so its events stop reaching the compositor.
+            if (@as(isize, @bitCast(std.os.linux.ioctl(self.fd, EVIOCGRAB, 1))) < 0) return error.GrabFailed;
+            // CRITICAL: ungrab on any later failure so the real mouse is never left grabbed.
+            errdefer _ = std.os.linux.ioctl(self.fd, EVIOCGRAB, 0);
+            self.passthrough_fd = try lx.createUinputDevice(
+                "zclicker-passthrough",
+                &.{ lx.BTN_LEFT, lx.BTN_RIGHT, lx.BTN_MIDDLE, lx.BTN_SIDE, lx.BTN_EXTRA, lx.BTN_FORWARD, lx.BTN_BACK, lx.BTN_TASK },
+                &.{ lx.REL_X, lx.REL_Y, lx.REL_WHEEL, lx.REL_HWHEEL, lx.REL_WHEEL_HI_RES, lx.REL_HWHEEL_HI_RES },
+            );
+        }
         return self;
     }
 
     pub fn deinit(self: *LinuxEvdev) void {
+        // ALWAYS ungrab first: the physical mouse must never be left grabbed.
+        if (self.fd >= 0 and self.suppress) _ = std.os.linux.ioctl(self.fd, EVIOCGRAB, 0);
+        if (self.passthrough_fd >= 0) {
+            lx.destroyUinputDevice(self.passthrough_fd);
+            lx.closeFd(self.passthrough_fd);
+            self.passthrough_fd = -1;
+        }
         if (self.fd >= 0) closeFd(self.fd);
         self.fd = -1;
     }
 
     pub fn interface(self: *LinuxEvdev) InputBackend {
-        return .{ .ptr = self, .caps = .{ .can_suppress = false }, .nextEventFn = nextEventImpl };
+        return .{ .ptr = self, .caps = .{ .can_suppress = true }, .nextEventFn = nextEventImpl };
     }
 
     pub fn deviceName(self: *const LinuxEvdev) []const u8 {
@@ -146,15 +174,21 @@ pub const LinuxEvdev = struct {
         };
         const count = bytes / @sizeOf(InputEvent);
         for (buf[0..count]) |ev| {
-            if (ev.type != EV_KEY) continue;
-            const pressed = switch (ev.value) {
-                1 => true,
-                0 => false,
-                else => continue, // 2 == autorepeat, irrelevant for mouse buttons
-            };
-            if (self.pending_len >= self.pending.len) break;
-            self.pending[self.pending_len] = .{ .button = ev.code, .pressed = pressed };
-            self.pending_len += 1;
+            // Only configured trigger buttons (press/release, not autorepeat) become TriggerEvents.
+            const is_trigger = ev.type == EV_KEY and codeInList(self.codes, ev.code) and (ev.value == 0 or ev.value == 1);
+            if (is_trigger) {
+                if (self.pending_len >= self.pending.len) continue;
+                self.pending[self.pending_len] = .{ .button = ev.code, .pressed = ev.value == 1 };
+                self.pending_len += 1;
+            } else if (self.suppress and ev.type != EV_MSC) {
+                // Re-inject every non-trigger event through the passthrough so the
+                // grabbed device's normal behaviour (movement, clicks, scroll) survives.
+                // EV_MSC (MSC_SCAN) is dropped: the kernel emits a scancode right before
+                // each button's EV_KEY, so re-injecting it for a *suppressed* trigger button
+                // would leak a scancode with no matching key. Dropping all MSC_SCAN is safe —
+                // it's supplementary hardware info the compositor doesn't need from a virtual device.
+                lx.writeEvent(self.passthrough_fd, ev.type, ev.code, ev.value) catch {};
+            }
         }
     }
 
@@ -200,6 +234,11 @@ pub const LinuxEvdev = struct {
         if (!found) std.debug.print("nenhum dispositivo com os botões pedidos.\n", .{});
     }
 };
+
+fn codeInList(codes: []const u16, code: u16) bool {
+    for (codes) |c| if (c == code) return true;
+    return false;
+}
 
 /// Query a device's name via EVIOCGNAME. Returns the length written to `buf`.
 fn nameInto(fd: std.posix.fd_t, buf: []u8) usize {
