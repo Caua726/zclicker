@@ -3,6 +3,39 @@ const lx = @import("zclicker").platform;
 
 const MAX_EVENT_NODES: usize = 64;
 
+pub const Entry = struct { path: [:0]const u8, name: [:0]const u8 };
+
+/// Enumerate non-virtual, key-capable input devices (the ones usable as a trigger
+/// source). Caller passes an arena; returned slices are owned by it.
+pub fn listDevices(arena: std.mem.Allocator) ![]Entry {
+    var out: std.ArrayList(Entry) = .empty;
+    var n: usize = 0;
+    while (n < 64) : (n += 1) {
+        var pathbuf: [32]u8 = undefined;
+        const path = std.fmt.bufPrintSentinel(&pathbuf, "/dev/input/event{d}", .{n}, 0) catch continue;
+        const fd = lx.openRdonlyNonblock(path) catch continue;
+        defer lx.closeFd(fd);
+        if (isVirtual(fd) or !hasAnyKey(fd)) continue;
+        var namebuf: [256]u8 = undefined;
+        const nm = nameOf(fd, &namebuf);
+        const name = if (nm == 0) "(desconhecido)" else namebuf[0..nm];
+        try out.append(arena, .{
+            .path = try arena.dupeSentinel(u8, path, 0),
+            .name = try arena.dupeSentinel(u8, name, 0),
+        });
+    }
+    return out.toOwnedSlice(arena);
+}
+
+fn nameOf(fd: std.posix.fd_t, buf: []u8) usize {
+    const rc = std.os.linux.ioctl(fd, lx.ior('E', 0x06, @intCast(buf.len)), @intFromPtr(buf.ptr));
+    const n = @as(isize, @bitCast(rc));
+    if (n <= 0) return 0;
+    var len: usize = @intCast(n);
+    if (len > 0 and buf[len - 1] == 0) len -= 1;
+    return len;
+}
+
 /// Block until the user presses any key/button on any real input device, then return
 /// its evdev code. Skips virtual devices. Needs read access to /dev/input (input group).
 pub fn captureNext() !u16 {

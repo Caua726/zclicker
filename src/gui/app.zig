@@ -32,7 +32,8 @@ const Ui = struct {
     // Advanced
     output: *gtk.GtkDropDown,
     suppress: *gtk.GtkSwitch,
-    device: *gtk.GtkEntry,
+    device_dd: *gtk.GtkDropDown,
+    device_paths: [][:0]const u8, // parallel to dropdown indices 1..N; index 0 = "auto"
 
     // Status
     status: *gtk.GtkLabel,
@@ -196,7 +197,10 @@ fn readConfig(ui: *Ui) command.Config {
         .click = click,
         .codes = ui.codes.items,
         .output = output,
-        .device = std.mem.span(gtk.gtk_editable_get_text(@ptrCast(ui.device))),
+        .device = blk: {
+            const sel = gtk.gtk_drop_down_get_selected(ui.device_dd);
+            break :blk if (sel == 0 or sel > ui.device_paths.len) "" else ui.device_paths[sel - 1];
+        },
         .suppress = gtk.gtk_switch_get_active(ui.suppress) != 0,
     };
 }
@@ -408,9 +412,17 @@ fn onActivate(app: *gtk.GtkApplication, _: gtk.gpointer) callconv(.c) void {
 
     const dev_row = row();
     gtk.gtk_box_append(@ptrCast(dev_row), dimLabel("Device"));
-    const device = gtk.gtk_entry_new();
-    gtk.gtk_widget_set_hexpand(device, 1);
-    gtk.gtk_box_append(@ptrCast(dev_row), device);
+    const dev_entries = capture.listDevices(gpa) catch &[_]capture.Entry{};
+    const dev_strings = gpa.alloc(?[*:0]const u8, dev_entries.len + 2) catch unreachable;
+    dev_strings[0] = "auto (todos)";
+    for (dev_entries, 0..) |e, i| dev_strings[i + 1] = e.name.ptr;
+    dev_strings[dev_entries.len + 1] = null;
+    const device_dd = gtk.gtk_drop_down_new_from_strings(dev_strings.ptr);
+    gtk.gtk_widget_set_hexpand(device_dd, 1);
+    gtk.gtk_widget_set_halign(device_dd, gtk.GTK_ALIGN_END);
+    const dev_paths = gpa.alloc([:0]const u8, dev_entries.len) catch unreachable;
+    for (dev_entries, 0..) |e, i| dev_paths[i] = e.path;
+    gtk.gtk_box_append(@ptrCast(dev_row), device_dd);
     gtk.gtk_box_append(@ptrCast(adv_box), dev_row);
 
     gtk.gtk_expander_set_child(@ptrCast(advanced), adv_box);
@@ -437,7 +449,8 @@ fn onActivate(app: *gtk.GtkApplication, _: gtk.gpointer) callconv(.c) void {
         .mode_toggle = mode_btns[1],
         .output = @ptrCast(output),
         .suppress = @ptrCast(suppress),
-        .device = @ptrCast(device),
+        .device_dd = @ptrCast(device_dd),
+        .device_paths = dev_paths,
         .status = @ptrCast(status),
         .codes = .empty,
         .child = null,
