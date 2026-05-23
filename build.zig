@@ -165,6 +165,13 @@ pub fn build(b: *std.Build) void {
     // --- GTK4 GUI (optional, only built with -Dgui or the `gui` step) ---
 
     const gui_enabled = b.option(bool, "gui", "Build the GTK GUI (zclicker-gui)") orelse false;
+    // Expose the engine's Linux helpers to the GUI's capture.zig, which lives
+    // outside the engine module path.
+    const linux_mod = b.createModule(.{
+        .root_source_file = b.path("src/platform/linux.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const gui_exe = b.addExecutable(.{
         .name = "zclicker-gui",
         .root_module = b.createModule(.{
@@ -172,6 +179,9 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .link_libc = true,
+            .imports = &.{
+                .{ .name = "linux", .module = linux_mod },
+            },
         }),
     });
     gui_exe.root_module.linkSystemLibrary("gtk4", .{});
