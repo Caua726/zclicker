@@ -1,0 +1,120 @@
+const std = @import("std");
+const input = @import("input/input.zig");
+
+pub const Config = struct {
+    interval_ms: i32 = 50,
+    device: ?[]const u8 = null,
+    buttons: [8]u16 = @splat(0),
+    button_count: usize = 0,
+    verbose: bool = false,
+    list: bool = false,
+    help: bool = false,
+
+    pub fn buttonCodes(self: *const Config) []const u16 {
+        return self.buttons[0..self.button_count];
+    }
+};
+
+pub const Error = error{ UnknownArgument, MissingValue, InvalidInterval, InvalidButton };
+
+fn eq(a: []const u8, b: []const u8) bool {
+    return std.mem.eql(u8, a, b);
+}
+
+/// Map a human-facing button number to its evdev code. Buttons 4/5 are the side
+/// buttons. Extend here as more triggers become useful.
+fn buttonCode(name: []const u8) ?u16 {
+    if (eq(name, "4")) return input.BTN_SIDE;
+    if (eq(name, "5")) return input.BTN_EXTRA;
+    return null;
+}
+
+fn parseButtons(cfg: *Config, spec: []const u8) Error!void {
+    cfg.button_count = 0;
+    var it = std.mem.tokenizeScalar(u8, spec, ',');
+    while (it.next()) |tok| {
+        if (cfg.button_count >= cfg.buttons.len) return Error.InvalidButton;
+        cfg.buttons[cfg.button_count] = buttonCode(tok) orelse return Error.InvalidButton;
+        cfg.button_count += 1;
+    }
+    if (cfg.button_count == 0) return Error.InvalidButton;
+}
+
+/// Parse argv (including argv[0]) into a Config.
+pub fn parse(args: []const [:0]const u8) Error!Config {
+    var cfg = Config{};
+    // Default trigger buttons: 4 and 5.
+    cfg.buttons[0] = input.BTN_SIDE;
+    cfg.buttons[1] = input.BTN_EXTRA;
+    cfg.button_count = 2;
+
+    var i: usize = 1;
+    while (i < args.len) : (i += 1) {
+        const a = args[i];
+        if (eq(a, "-h") or eq(a, "--help")) {
+            cfg.help = true;
+        } else if (eq(a, "-l") or eq(a, "--list")) {
+            cfg.list = true;
+        } else if (eq(a, "-v") or eq(a, "--verbose")) {
+            cfg.verbose = true;
+        } else if (eq(a, "-i") or eq(a, "--interval")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            cfg.interval_ms = std.fmt.parseInt(i32, args[i], 10) catch return Error.InvalidInterval;
+            if (cfg.interval_ms <= 0) return Error.InvalidInterval;
+        } else if (eq(a, "-d") or eq(a, "--device")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            cfg.device = args[i];
+        } else if (eq(a, "-b") or eq(a, "--buttons")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            try parseButtons(&cfg, args[i]);
+        } else {
+            return Error.UnknownArgument;
+        }
+    }
+    return cfg;
+}
+
+test "defaults" {
+    const t = std.testing;
+    const args = [_][:0]const u8{"zclicker"};
+    const cfg = try parse(&args);
+    try t.expectEqual(@as(i32, 50), cfg.interval_ms);
+    try t.expectEqual(@as(usize, 2), cfg.button_count);
+    try t.expect(cfg.device == null);
+}
+
+test "interval override" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--interval", "100" };
+    const cfg = try parse(&args);
+    try t.expectEqual(@as(i32, 100), cfg.interval_ms);
+}
+
+test "buttons override" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "-b", "4" };
+    const cfg = try parse(&args);
+    try t.expectEqual(@as(usize, 1), cfg.button_count);
+    try t.expectEqual(input.BTN_SIDE, cfg.buttons[0]);
+}
+
+test "unknown arg errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--nope" };
+    try t.expectError(Error.UnknownArgument, parse(&args));
+}
+
+test "non-numeric interval errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "-i", "abc" };
+    try t.expectError(Error.InvalidInterval, parse(&args));
+}
+
+test "missing value errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--interval" };
+    try t.expectError(Error.MissingValue, parse(&args));
+}
