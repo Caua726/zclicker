@@ -45,21 +45,23 @@ zig build test         # roda os testes
 
 ## GUI
 
-Janela nativa **GTK4** (`zclicker-gui`) que monta as opções e roda o CLI por baixo.
+Janela nativa **GTK4** embutida no próprio binário `zclicker`. Quando compilado
+com `-Dgui`, rodar `zclicker` sem argumentos abre a janela; rodar com flags
+executa o engine normalmente.
 
 ```sh
-zig build -Dgui                  # compila a GUI (precisa das libs de dev do GTK4)
-./zig-out/bin/zclicker-gui       # abre a janela
-# ou:
-zig build gui                    # compila e abre a janela
+zig build -Dgui                  # compila com GUI (precisa das libs de dev do GTK4)
+./zig-out/bin/zclicker           # sem argumentos → abre a janela GTK4
+./zig-out/bin/zclicker -i 30     # com flags → executa o engine diretamente
 ```
 
-A GUI **spawna o binário `zclicker`** para fazer o clique de fato. Ela procura o
-`zclicker` ao lado do próprio executável (`zig build -Dgui` instala os dois em
-`zig-out/bin/`); se mover a GUI, mantenha o `zclicker` junto ou no `PATH`. As
-permissões de `/dev/uinput` continuam valendo (veja [Permissões](#permissões)),
-e a captura de gatilho na GUI lê `/dev/input`, então o grupo `input` também é
-necessário.
+Um `zig build` simples (sem `-Dgui`) gera um binário GTK-free; `zclicker` sem
+argumentos nesse caso executa o engine com os padrões.
+
+A GUI **spawna o mesmo binário** com as flags do engine (lê `/proc/self/exe`
+pra encontrar o próprio executável). As permissões de `/dev/uinput` continuam
+valendo (veja [Permissões](#permissões)), e a captura de gatilho na GUI lê
+`/dev/input`, então o grupo `input` também é necessário.
 
 ## Uso
 

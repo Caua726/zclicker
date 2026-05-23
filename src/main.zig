@@ -1,6 +1,8 @@
 const std = @import("std");
 const z = @import("zclicker");
 const select = z.select;
+const build_options = @import("build_options");
+const gui = if (build_options.gui) @import("gui/app.zig") else struct {};
 
 var g_evdev: ?*z.LinuxEvdev = null;
 var g_uinput: ?*z.Uinput = null;
@@ -26,6 +28,13 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     const args = try init.minimal.args.toSlice(arena);
+
+    if (build_options.gui) {
+        if (args.len <= 1) { // bare `zclicker` → open the GUI
+            try gui.launch();
+            return;
+        }
+    }
 
     const cfg = z.cli.parse(args) catch |err| {
         std.debug.print("erro: {s}\n\n", .{@errorName(err)});

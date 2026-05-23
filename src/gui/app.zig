@@ -85,20 +85,14 @@ fn readConfig(ui: *Ui) command.Config {
     };
 }
 
-/// Resolve the zclicker binary: sibling of this exe, else "zclicker" on PATH.
+/// Resolve the path of the currently-running executable (reads /proc/self/exe),
+/// so the GUI spawns itself with engine flags.
 fn resolveBin(arena: std.mem.Allocator) []const u8 {
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
-    const rc = std.os.linux.readlink("/proc/self/exe", &buf, buf.len);
-    const n: isize = @bitCast(rc);
-    if (n <= 0 or @as(usize, @intCast(n)) >= buf.len) return "zclicker";
-    const exe = buf[0..@intCast(n)];
-    const dir = std.fs.path.dirname(exe) orelse return "zclicker";
-    var pbuf: [std.fs.max_path_bytes]u8 = undefined;
-    const sib = std.fmt.bufPrintSentinel(&pbuf, "{s}/zclicker", .{dir}, 0) catch return "zclicker";
-    if (@as(isize, @bitCast(std.os.linux.access(sib.ptr, 0))) == 0) {
-        return arena.dupe(u8, sib) catch "zclicker";
-    }
-    return "zclicker";
+    var buf: [4096]u8 = undefined;
+    const n = std.os.linux.readlink("/proc/self/exe", &buf, buf.len);
+    const sn = @as(isize, @bitCast(n));
+    if (sn <= 0) return "zclicker";
+    return arena.dupe(u8, buf[0..@intCast(sn)]) catch "zclicker";
 }
 
 fn onCapture(_: *gtk.GtkButton, data: gtk.gpointer) callconv(.c) void {
@@ -233,7 +227,7 @@ fn onActivate(app: *gtk.GtkApplication, _: gtk.gpointer) callconv(.c) void {
     gtk.gtk_window_present(@ptrCast(win));
 }
 
-pub fn main() !void {
+pub fn launch() !void {
     const app = gtk.gtk_application_new("org.zclicker.gui", gtk.G_APPLICATION_DEFAULT_FLAGS);
     defer gtk.g_object_unref(app);
     _ = gtk.g_signal_connect_data(app, "activate", @ptrCast(&onActivate), null, null, 0);

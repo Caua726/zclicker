@@ -1,5 +1,5 @@
 const std = @import("std");
-const lx = @import("linux");
+const lx = @import("zclicker").platform;
 
 const MAX_EVENT_NODES: usize = 64;
 

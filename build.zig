@@ -83,6 +83,18 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // GTK GUI toggle: `zig build -Dgui` folds the GUI into the main exe.
+    // When gui_enabled=true, bare `zclicker` (no args) opens the GTK window;
+    // bare `zig build` stays GTK-free (CLI only).
+    const gui_enabled = b.option(bool, "gui", "Include the GTK GUI (zclicker opens the GUI when run with no args)") orelse false;
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "gui", gui_enabled);
+    exe.root_module.addOptions("build_options", build_options);
+    if (gui_enabled) {
+        exe.root_module.link_libc = true;
+        exe.root_module.linkSystemLibrary("gtk4", .{});
+    }
+
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
@@ -161,34 +173,4 @@ pub fn build(b: *std.Build) void {
     //
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
-
-    // --- GTK4 GUI (optional, only built with -Dgui or the `gui` step) ---
-
-    const gui_enabled = b.option(bool, "gui", "Build the GTK GUI (zclicker-gui)") orelse false;
-    // Expose the engine's Linux helpers to the GUI's capture.zig, which lives
-    // outside the engine module path.
-    const linux_mod = b.createModule(.{
-        .root_source_file = b.path("src/platform/linux.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const gui_exe = b.addExecutable(.{
-        .name = "zclicker-gui",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/gui/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-            .imports = &.{
-                .{ .name = "linux", .module = linux_mod },
-            },
-        }),
-    });
-    gui_exe.root_module.linkSystemLibrary("gtk4", .{});
-    if (gui_enabled) b.installArtifact(gui_exe);
-    const gui_run = b.addRunArtifact(gui_exe);
-    gui_run.step.dependOn(b.getInstallStep());
-    if (b.args) |args| gui_run.addArgs(args);
-    const gui_step = b.step("gui", "Build and run the GTK GUI");
-    gui_step.dependOn(&gui_run.step);
 }
