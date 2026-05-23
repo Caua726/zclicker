@@ -9,13 +9,17 @@ pub const Config = struct {
     verbose: bool = false,
     list: bool = false,
     help: bool = false,
+    input: ?backend.BackendId = null,
+    output: ?backend.BackendId = null,
+    suppress: bool = false,
+    list_backends: bool = false,
 
     pub fn buttonCodes(self: *const Config) []const u16 {
         return self.buttons[0..self.button_count];
     }
 };
 
-pub const Error = error{ UnknownArgument, MissingValue, InvalidInterval, InvalidButton };
+pub const Error = error{ UnknownArgument, MissingValue, InvalidInterval, InvalidButton, UnknownBackend };
 
 fn eq(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
@@ -70,6 +74,18 @@ pub fn parse(args: []const [:0]const u8) Error!Config {
             i += 1;
             if (i >= args.len) return Error.MissingValue;
             try parseButtons(&cfg, args[i]);
+        } else if (eq(a, "--input")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            cfg.input = backend.BackendId.parse(args[i]) orelse return Error.UnknownBackend;
+        } else if (eq(a, "--output")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            cfg.output = backend.BackendId.parse(args[i]) orelse return Error.UnknownBackend;
+        } else if (eq(a, "--suppress")) {
+            cfg.suppress = true;
+        } else if (eq(a, "--list-backends")) {
+            cfg.list_backends = true;
         } else {
             return Error.UnknownArgument;
         }
@@ -117,4 +133,26 @@ test "missing value errors" {
     const t = std.testing;
     const args = [_][:0]const u8{ "zclicker", "--interval" };
     try t.expectError(Error.MissingValue, parse(&args));
+}
+
+test "input/output/suppress flags parse" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--input", "evdev", "--output", "uinput", "--suppress" };
+    const cfg = try parse(&args);
+    try t.expectEqual(backend.BackendId.evdev, cfg.input.?);
+    try t.expectEqual(backend.BackendId.uinput, cfg.output.?);
+    try t.expect(cfg.suppress);
+}
+
+test "unknown backend errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--output", "nope" };
+    try t.expectError(Error.UnknownBackend, parse(&args));
+}
+
+test "list-backends flag" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--list-backends" };
+    const cfg = try parse(&args);
+    try t.expect(cfg.list_backends);
 }
