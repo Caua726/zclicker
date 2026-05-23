@@ -94,8 +94,8 @@ pub fn main(init: std.process.Init) !void {
 
     var triggers = z.core.Triggers{ .codes = cfg.buttonCodes() };
     std.debug.print(
-        "zclicker: {s} | {d}ms | {s} | clica={s} | in={s} out={s}{s} | Ctrl+C\n",
-        .{ evdev.deviceName(), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click),
+        "zclicker: {s} ({d} disp.) | {d}ms | {s} | clica={s} | in={s} out={s}{s} | Ctrl+C\n",
+        .{ evdev.deviceName(), evdev.deviceCount(), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click),
            @tagName(choice.input), @tagName(choice.output), if (cfg.suppress) " | suppress" else "" },
     );
     installSignals();
@@ -129,7 +129,7 @@ fn printUsage() void {
         \\
         \\uso: zclicker [opções]
         \\  -i, --interval <ms>    intervalo entre cliques (padrão 50)
-        \\  -b, --buttons <lista>  botões-gatilho, ex: 4,5 (padrão 4,5)
+        \\  -b, --buttons <lista>  gatilhos: nomes (left,right,middle,4,5,forward,back) ou códigos evdev, ex: 4,5 ou left,183
         \\  -d, --device <path>    /dev/input/eventX (padrão: autodetecta)
         \\  -l, --list             lista dispositivos com botões laterais
         \\  -v, --verbose          loga cada gatilho e clique
