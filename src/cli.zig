@@ -1,5 +1,5 @@
 const std = @import("std");
-const input = @import("input/input.zig");
+const backend = @import("backend.zig");
 
 pub const Config = struct {
     interval_ms: i32 = 50,
@@ -24,8 +24,8 @@ fn eq(a: []const u8, b: []const u8) bool {
 /// Map a human-facing button number to its evdev code. Buttons 4/5 are the side
 /// buttons. Extend here as more triggers become useful.
 fn buttonCode(name: []const u8) ?u16 {
-    if (eq(name, "4")) return input.BTN_SIDE;
-    if (eq(name, "5")) return input.BTN_EXTRA;
+    if (eq(name, "4")) return backend.BTN_SIDE;
+    if (eq(name, "5")) return backend.BTN_EXTRA;
     return null;
 }
 
@@ -44,8 +44,8 @@ fn parseButtons(cfg: *Config, spec: []const u8) Error!void {
 pub fn parse(args: []const [:0]const u8) Error!Config {
     var cfg = Config{};
     // Default trigger buttons: 4 and 5.
-    cfg.buttons[0] = input.BTN_SIDE;
-    cfg.buttons[1] = input.BTN_EXTRA;
+    cfg.buttons[0] = backend.BTN_SIDE;
+    cfg.buttons[1] = backend.BTN_EXTRA;
     cfg.button_count = 2;
 
     var i: usize = 1;
@@ -98,7 +98,7 @@ test "buttons override" {
     const args = [_][:0]const u8{ "zclicker", "-b", "4" };
     const cfg = try parse(&args);
     try t.expectEqual(@as(usize, 1), cfg.button_count);
-    try t.expectEqual(input.BTN_SIDE, cfg.buttons[0]);
+    try t.expectEqual(backend.BTN_SIDE, cfg.buttons[0]);
 }
 
 test "unknown arg errors" {

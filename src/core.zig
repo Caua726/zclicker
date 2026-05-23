@@ -1,8 +1,7 @@
 const std = @import("std");
-const input = @import("input/input.zig");
-const output = @import("output/output.zig");
+const backend = @import("backend.zig");
 
-pub const TriggerEvent = input.TriggerEvent;
+pub const TriggerEvent = backend.TriggerEvent;
 
 /// Tracks which configured trigger buttons are currently held. `codes` and the
 /// first `codes.len` entries of `held` run in parallel.
@@ -10,7 +9,7 @@ pub const Triggers = struct {
     codes: []const u16,
     held: [8]bool = @splat(false),
 
-    pub fn apply(self: *Triggers, ev: input.TriggerEvent) void {
+    pub fn apply(self: *Triggers, ev: backend.TriggerEvent) void {
         for (self.codes, 0..) |code, i| {
             if (code == ev.button) self.held[i] = ev.pressed;
         }
@@ -29,8 +28,8 @@ pub const Triggers = struct {
 /// poll timeout, so there are no locks and no races. When nothing is held the
 /// timeout is infinite, so the loop sleeps until the next button event.
 pub fn run(
-    in_backend: input.InputBackend,
-    out_backend: output.OutputBackend,
+    in_backend: backend.InputBackend,
+    out_backend: backend.OutputBackend,
     triggers: *Triggers,
     interval_ms: i32,
     verbose: bool,
@@ -55,32 +54,32 @@ pub fn run(
 
 test "anyHeld reflects press and release" {
     const t = std.testing;
-    var codes = [_]u16{ input.BTN_SIDE, input.BTN_EXTRA };
+    var codes = [_]u16{ backend.BTN_SIDE, backend.BTN_EXTRA };
     var trig = Triggers{ .codes = &codes };
 
     try t.expect(!trig.anyHeld());
-    trig.apply(.{ .button = input.BTN_SIDE, .pressed = true });
+    trig.apply(.{ .button = backend.BTN_SIDE, .pressed = true });
     try t.expect(trig.anyHeld());
-    trig.apply(.{ .button = input.BTN_SIDE, .pressed = false });
+    trig.apply(.{ .button = backend.BTN_SIDE, .pressed = false });
     try t.expect(!trig.anyHeld());
 }
 
 test "held until all buttons released" {
     const t = std.testing;
-    var codes = [_]u16{ input.BTN_SIDE, input.BTN_EXTRA };
+    var codes = [_]u16{ backend.BTN_SIDE, backend.BTN_EXTRA };
     var trig = Triggers{ .codes = &codes };
 
-    trig.apply(.{ .button = input.BTN_SIDE, .pressed = true });
-    trig.apply(.{ .button = input.BTN_EXTRA, .pressed = true });
-    trig.apply(.{ .button = input.BTN_SIDE, .pressed = false });
+    trig.apply(.{ .button = backend.BTN_SIDE, .pressed = true });
+    trig.apply(.{ .button = backend.BTN_EXTRA, .pressed = true });
+    trig.apply(.{ .button = backend.BTN_SIDE, .pressed = false });
     try t.expect(trig.anyHeld()); // EXTRA still down
-    trig.apply(.{ .button = input.BTN_EXTRA, .pressed = false });
+    trig.apply(.{ .button = backend.BTN_EXTRA, .pressed = false });
     try t.expect(!trig.anyHeld());
 }
 
 test "unconfigured button is ignored" {
     const t = std.testing;
-    var codes = [_]u16{input.BTN_SIDE};
+    var codes = [_]u16{backend.BTN_SIDE};
     var trig = Triggers{ .codes = &codes };
     trig.apply(.{ .button = 0x110, .pressed = true }); // BTN_LEFT
     try t.expect(!trig.anyHeld());

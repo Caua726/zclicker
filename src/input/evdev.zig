@@ -1,8 +1,8 @@
 const std = @import("std");
-const iface = @import("input.zig");
+const backend = @import("../backend.zig");
 
-const InputBackend = iface.InputBackend;
-const TriggerEvent = iface.TriggerEvent;
+const InputBackend = backend.InputBackend;
+const TriggerEvent = backend.TriggerEvent;
 
 const EV_KEY: u16 = 0x01;
 const KEY_MAX: usize = 0x2ff;
@@ -91,8 +91,8 @@ pub const LinuxEvdev = struct {
         self.fd = -1;
     }
 
-    pub fn backend(self: *LinuxEvdev) InputBackend {
-        return .{ .ptr = self, .nextEventFn = nextEventImpl };
+    pub fn interface(self: *LinuxEvdev) InputBackend {
+        return .{ .ptr = self, .caps = .{ .can_suppress = false }, .nextEventFn = nextEventImpl };
     }
 
     pub fn deviceName(self: *const LinuxEvdev) []const u8 {

@@ -46,7 +46,7 @@ pub fn main(init: std.process.Init) !void {
         .{ evdev.deviceName(), cfg.interval_ms },
     );
 
-    try z.core.run(evdev.backend(), ydotool.backend(), &triggers, cfg.interval_ms, cfg.verbose);
+    try z.core.run(evdev.interface(), ydotool.interface(), &triggers, cfg.interval_ms, cfg.verbose);
 }
 
 fn printUsage() void {

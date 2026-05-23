@@ -1,5 +1,5 @@
 const std = @import("std");
-const OutputBackend = @import("output.zig").OutputBackend;
+const OutputBackend = @import("../backend.zig").OutputBackend;
 
 /// Output backend that performs a left click by spawning `ydotool click 0xC0`.
 /// 0xC0 = left button down + up in ydotool's hex button encoding
@@ -11,7 +11,7 @@ pub const Ydotool = struct {
         return .{ .io = io };
     }
 
-    pub fn backend(self: *Ydotool) OutputBackend {
+    pub fn interface(self: *Ydotool) OutputBackend {
         return .{ .ptr = self, .clickFn = clickImpl };
     }
 

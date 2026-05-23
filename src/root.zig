@@ -4,10 +4,9 @@
 
 pub const cli = @import("cli.zig");
 pub const core = @import("core.zig");
-pub const input = @import("input/input.zig");
-pub const output = @import("output/output.zig");
+pub const backend = @import("backend.zig");
 
-pub const LinuxEvdev = @import("input/linux_evdev.zig").LinuxEvdev;
+pub const LinuxEvdev = @import("input/evdev.zig").LinuxEvdev;
 pub const Ydotool = @import("output/ydotool.zig").Ydotool;
 
 test {
