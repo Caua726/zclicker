@@ -29,4 +29,5 @@ test {
     _ = backend;
     _ = select;
     _ = codes;
+    if (is_linux) _ = platform; // keep the Linux ioctl-constant test running
 }
