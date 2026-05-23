@@ -23,21 +23,40 @@ pub const Triggers = struct {
     }
 };
 
-/// Main event loop. While any trigger button is held, emit a click every
-/// `interval_ms`. Single-threaded: the timing comes from the input backend's
-/// poll timeout, so there are no locks and no races. When nothing is held the
-/// timeout is infinite, so the loop sleeps until the next button event.
+/// Toggle-mode activation: each trigger press flips it.
+pub const Toggle = struct {
+    active: bool = false,
+    pub fn press(self: *Toggle) void {
+        self.active = !self.active;
+    }
+};
+
+/// Main event loop. While any trigger button is held (hold mode) or toggle is
+/// active (toggle mode), emit a click every `interval_ms`. Single-threaded:
+/// the timing comes from the input backend's poll timeout, so there are no
+/// locks and no races.
 pub fn run(
     in_backend: backend.InputBackend,
     out_backend: backend.OutputBackend,
     triggers: *Triggers,
+    mode: backend.Mode,
     interval_ms: i32,
     verbose: bool,
 ) !void {
+    var toggle = Toggle{};
     while (true) {
-        const timeout: i32 = if (triggers.anyHeld()) interval_ms else -1;
+        const clicking = switch (mode) {
+            .hold => triggers.anyHeld(),
+            .toggle => toggle.active,
+        };
+        const timeout: i32 = if (clicking) interval_ms else -1;
         if (try in_backend.nextEvent(timeout)) |ev| {
-            triggers.apply(ev);
+            // The input backend only emits events for configured trigger codes,
+            // so in toggle mode every press is a toggle.
+            switch (mode) {
+                .hold => triggers.apply(ev),
+                .toggle => if (ev.pressed) toggle.press(),
+            }
             if (verbose) {
                 std.debug.print("[trigger] 0x{x} {s}\n", .{
                     ev.button,
@@ -45,7 +64,6 @@ pub fn run(
                 });
             }
         } else {
-            // Timeout with a button held -> fire one click.
             try out_backend.click();
             if (verbose) std.debug.print("[click]\n", .{});
         }
@@ -83,4 +101,14 @@ test "unconfigured button is ignored" {
     var trig = Triggers{ .codes = &codes };
     trig.apply(.{ .button = 0x110, .pressed = true }); // BTN_LEFT
     try t.expect(!trig.anyHeld());
+}
+
+test "Toggle flips active on each press" {
+    const t = std.testing;
+    var tg = Toggle{};
+    try t.expect(!tg.active);
+    tg.press();
+    try t.expect(tg.active);
+    tg.press();
+    try t.expect(!tg.active);
 }
