@@ -3,6 +3,7 @@ const std = @import("std");
 pub const EV_SYN: u16 = 0x00;
 pub const EV_KEY: u16 = 0x01;
 pub const EV_REL: u16 = 0x02;
+pub const EV_MSC: u16 = 0x04;
 pub const SYN_REPORT: u16 = 0x00;
 
 pub const BTN_LEFT: u16 = 0x110;
