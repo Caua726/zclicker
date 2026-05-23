@@ -42,3 +42,60 @@ pub const OutputBackend = struct {
         return self.clickFn(self.ptr);
     }
 };
+
+pub const ClickButton = enum {
+    left,
+    right,
+    middle,
+    pub fn evdevCode(self: ClickButton) u16 {
+        return switch (self) {
+            .left => lx.BTN_LEFT,
+            .right => lx.BTN_RIGHT,
+            .middle => lx.BTN_MIDDLE,
+        };
+    }
+    /// ydotool hex button code: low nibble = button, 0x40 down + 0x80 up.
+    pub fn ydotoolHex(self: ClickButton) []const u8 {
+        return switch (self) {
+            .left => "0xC0",
+            .right => "0xC1",
+            .middle => "0xC2",
+        };
+    }
+    pub fn parse(s: []const u8) ?ClickButton {
+        inline for (@typeInfo(ClickButton).@"enum".fields) |f| {
+            if (std.mem.eql(u8, s, f.name)) return @field(ClickButton, f.name);
+        }
+        return null;
+    }
+};
+
+pub const Mode = enum {
+    hold,
+    toggle,
+    pub fn parse(s: []const u8) ?Mode {
+        inline for (@typeInfo(Mode).@"enum".fields) |f| {
+            if (std.mem.eql(u8, s, f.name)) return @field(Mode, f.name);
+        }
+        return null;
+    }
+};
+
+test "ClickButton maps to evdev codes and ydotool hex" {
+    const t = std.testing;
+    try t.expectEqual(lx.BTN_LEFT, ClickButton.left.evdevCode());
+    try t.expectEqual(lx.BTN_RIGHT, ClickButton.right.evdevCode());
+    try t.expectEqual(lx.BTN_MIDDLE, ClickButton.middle.evdevCode());
+    try t.expectEqualStrings("0xC0", ClickButton.left.ydotoolHex());
+    try t.expectEqualStrings("0xC1", ClickButton.right.ydotoolHex());
+    try t.expectEqualStrings("0xC2", ClickButton.middle.ydotoolHex());
+    try t.expectEqual(ClickButton.middle, ClickButton.parse("middle").?);
+    try t.expect(ClickButton.parse("nope") == null);
+}
+
+test "Mode parse" {
+    const t = std.testing;
+    try t.expectEqual(Mode.hold, Mode.parse("hold").?);
+    try t.expectEqual(Mode.toggle, Mode.parse("toggle").?);
+    try t.expect(Mode.parse("x") == null);
+}

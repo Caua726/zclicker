@@ -18,4 +18,5 @@ test {
     _ = core;
     _ = @import("platform/linux.zig");
     _ = @import("select.zig");
+    _ = @import("backend.zig");
 }
