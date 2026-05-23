@@ -142,6 +142,14 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
+    // GUI argv-builder tests (no GTK dependency — pure Zig).
+    const gui_cmd_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("src/gui/command.zig"),
+        .target = target,
+        .optimize = optimize,
+    }) });
+    test_step.dependOn(&b.addRunArtifact(gui_cmd_tests).step);
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means
