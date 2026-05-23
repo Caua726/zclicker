@@ -11,7 +11,7 @@ pub const TriggerEvent = struct {
 
 pub const BackendId = enum {
     evdev,
-    uinput, // output backend; wired in once the native uinput backend lands
+    uinput, // native uinput output backend (default)
     ydotool,
     pub fn parse(s: []const u8) ?BackendId {
         inline for (@typeInfo(BackendId).@"enum".fields) |f| {

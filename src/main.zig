@@ -132,6 +132,8 @@ fn printUsage() void {
         \\  -d, --device <path>    /dev/input/eventX (padrão: autodetecta)
         \\  -l, --list             lista dispositivos com botões laterais
         \\  -v, --verbose          loga cada gatilho e clique
+        \\      --suppress         suprime voltar/avançar nos botões 4/5 (via EVIOCGRAB)
+        \\      --input <backend>  entrada: evdev
         \\      --output <backend> saída: uinput (padrão) ou ydotool
         \\      --list-backends    lista backends disponíveis
         \\  -h, --help             esta ajuda

@@ -19,8 +19,9 @@ fn eviocgname(len: u32) u32 {
 
 /// Linux input backend: reads button events straight from `/dev/input/eventX`.
 /// Works under Wayland because it taps the kernel input layer, below the
-/// compositor. v1 is passive (read-only): it does not grab the device, so the
-/// side buttons still perform their normal back/forward action.
+/// compositor. By default it's passive (read-only) so the side buttons keep their
+/// normal back/forward action; with `suppress` it grabs the device (EVIOCGRAB) and
+/// re-injects every non-trigger event through a uinput passthrough.
 pub const LinuxEvdev = struct {
     fd: std.posix.fd_t,
     name_buf: [256]u8 = undefined,
