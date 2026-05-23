@@ -54,11 +54,16 @@ fn refreshTriggers(ui: *Ui) void {
     }
     var len: usize = 0;
     for (ui.codes.items, 0..) |code, i| {
-        if (i != 0 and len + 2 < buf.len) { buf[len] = ','; buf[len + 1] = ' '; len += 2; }
+        if (len + 8 >= buf.len) break; // leave room for ", NNNNN" + NUL
+        if (i != 0) {
+            buf[len] = ',';
+            buf[len + 1] = ' ';
+            len += 2;
+        }
         const s = std.fmt.bufPrint(buf[len..], "{d}", .{code}) catch break;
         len += s.len;
     }
-    buf[len] = 0;
+    buf[len] = 0; // len < buf.len guaranteed by the room check above
     gtk.gtk_label_set_text(@ptrCast(ui.triggers_label), @ptrCast(buf[0..len :0]));
 }
 
@@ -139,6 +144,7 @@ fn onStart(_: *gtk.GtkButton, data: gtk.gpointer) callconv(.c) void {
     var gerr: ?*gtk.GError = null;
     const child = gtk.g_subprocess_newv(cargv.ptr, gtk.G_SUBPROCESS_FLAGS_NONE, &gerr);
     if (child == null) {
+        if (gerr) |e| gtk.g_error_free(e);
         setStatus(ui, "falha ao iniciar (zclicker no PATH? acesso a /dev/uinput?)", false);
         return;
     }

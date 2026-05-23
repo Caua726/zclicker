@@ -31,6 +31,7 @@ pub const G_SUBPROCESS_FLAGS_NONE: c_uint = 0;
 pub extern fn gtk_application_new(application_id: [*:0]const u8, flags: c_uint) *GtkApplication;
 pub extern fn g_application_run(application: *GApplication, argc: c_int, argv: ?[*]?[*:0]u8) c_int;
 pub extern fn g_object_unref(object: gpointer) void;
+pub extern fn g_error_free(@"error": *GError) void;
 pub extern fn g_signal_connect_data(instance: gpointer, detailed_signal: [*:0]const u8, c_handler: GCallback, data: gpointer, destroy_data: gpointer, connect_flags: c_uint) c_ulong;
 
 pub extern fn gtk_application_window_new(application: *GtkApplication) *GtkWidget;
