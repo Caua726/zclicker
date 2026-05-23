@@ -13,13 +13,15 @@ pub const Config = struct {
     output: ?backend.BackendId = null,
     suppress: bool = false,
     list_backends: bool = false,
+    click: backend.ClickButton = .left,
+    mode: backend.Mode = .hold,
 
     pub fn buttonCodes(self: *const Config) []const u16 {
         return self.buttons[0..self.button_count];
     }
 };
 
-pub const Error = error{ UnknownArgument, MissingValue, InvalidInterval, InvalidButton, UnknownBackend };
+pub const Error = error{ UnknownArgument, MissingValue, InvalidInterval, InvalidButton, UnknownBackend, InvalidClick, InvalidMode };
 
 fn eq(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
@@ -86,6 +88,14 @@ pub fn parse(args: []const [:0]const u8) Error!Config {
             cfg.suppress = true;
         } else if (eq(a, "--list-backends")) {
             cfg.list_backends = true;
+        } else if (eq(a, "--click")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            cfg.click = backend.ClickButton.parse(args[i]) orelse return Error.InvalidClick;
+        } else if (eq(a, "--mode")) {
+            i += 1;
+            if (i >= args.len) return Error.MissingValue;
+            cfg.mode = backend.Mode.parse(args[i]) orelse return Error.InvalidMode;
         } else {
             return Error.UnknownArgument;
         }
@@ -155,4 +165,32 @@ test "list-backends flag" {
     const args = [_][:0]const u8{ "zclicker", "--list-backends" };
     const cfg = try parse(&args);
     try t.expect(cfg.list_backends);
+}
+
+test "click and mode flags parse" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--click", "right", "--mode", "toggle" };
+    const cfg = try parse(&args);
+    try t.expectEqual(backend.ClickButton.right, cfg.click);
+    try t.expectEqual(backend.Mode.toggle, cfg.mode);
+}
+
+test "click/mode defaults" {
+    const t = std.testing;
+    const args = [_][:0]const u8{"zclicker"};
+    const cfg = try parse(&args);
+    try t.expectEqual(backend.ClickButton.left, cfg.click);
+    try t.expectEqual(backend.Mode.hold, cfg.mode);
+}
+
+test "invalid click errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--click", "sideways" };
+    try t.expectError(Error.InvalidClick, parse(&args));
+}
+
+test "invalid mode errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "--mode", "spam" };
+    try t.expectError(Error.InvalidMode, parse(&args));
 }
