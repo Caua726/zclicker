@@ -77,7 +77,7 @@ pub fn main(init: std.process.Init) !void {
     var uinput: z.Uinput = undefined;
     const out_iface: z.backend.OutputBackend = switch (choice.output) {
         .uinput => blk: {
-            uinput = z.Uinput.init() catch |err| {
+            uinput = z.Uinput.init(cfg.click) catch |err| {
                 std.debug.print("uinput indisponível ({s}); tente --output ydotool ou dê acesso a /dev/uinput.\n", .{@errorName(err)});
                 std.process.exit(1);
             };
@@ -85,7 +85,7 @@ pub fn main(init: std.process.Init) !void {
             break :blk uinput.interface();
         },
         .ydotool => blk: {
-            ydotool = z.Ydotool.init(io);
+            ydotool = z.Ydotool.init(io, cfg.click);
             break :blk ydotool.interface();
         },
         .evdev => unreachable, // evdev is never an output
@@ -93,12 +93,13 @@ pub fn main(init: std.process.Init) !void {
     defer if (choice.output == .uinput) uinput.deinit();
 
     var triggers = z.core.Triggers{ .codes = cfg.buttonCodes() };
-    std.debug.print("zclicker: {s} | {d}ms | in={s} out={s}{s} | Ctrl+C\n", .{
-        evdev.deviceName(), cfg.interval_ms, @tagName(choice.input), @tagName(choice.output),
-        if (cfg.suppress) " | suppress" else "",
-    });
+    std.debug.print(
+        "zclicker: {s} | {d}ms | {s} | clica={s} | in={s} out={s}{s} | Ctrl+C\n",
+        .{ evdev.deviceName(), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click),
+           @tagName(choice.input), @tagName(choice.output), if (cfg.suppress) " | suppress" else "" },
+    );
     installSignals();
-    try z.core.run(evdev.interface(), out_iface, &triggers, cfg.interval_ms, cfg.verbose);
+    try z.core.run(evdev.interface(), out_iface, &triggers, cfg.mode, cfg.interval_ms, cfg.verbose);
 }
 
 fn probeEnv() z.select.Env {
@@ -136,6 +137,8 @@ fn printUsage() void {
         \\      --input <backend>  entrada: evdev
         \\      --output <backend> saída: uinput (padrão) ou ydotool
         \\      --list-backends    lista backends disponíveis
+        \\      --click <btn>      botão clicado: left (padrão), right, middle
+        \\      --mode <modo>      hold (padrão, segurar) ou toggle (alternar)
         \\  -h, --help             esta ajuda
         \\
     , .{});
