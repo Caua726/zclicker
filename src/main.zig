@@ -2,6 +2,25 @@ const std = @import("std");
 const z = @import("zclicker");
 const select = z.select;
 
+var g_evdev: ?*z.LinuxEvdev = null;
+var g_uinput: ?*z.Uinput = null;
+
+fn onSignal(_: std.posix.SIG) callconv(.c) void {
+    if (g_evdev) |e| e.deinit();
+    if (g_uinput) |u| u.deinit();
+    std.process.exit(0);
+}
+
+fn installSignals() void {
+    var act = std.posix.Sigaction{
+        .handler = .{ .handler = onSignal },
+        .mask = std.posix.sigemptyset(),
+        .flags = 0,
+    };
+    std.posix.sigaction(std.posix.SIG.INT, &act, null);
+    std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+}
+
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const io = init.io;
@@ -42,6 +61,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     };
     defer evdev.deinit();
+    g_evdev = &evdev;
 
     const env = probeEnv();
     const choice = select.resolve(env, .{
@@ -61,6 +81,7 @@ pub fn main(init: std.process.Init) !void {
                 std.debug.print("uinput indisponível ({s}); tente --output ydotool ou dê acesso a /dev/uinput.\n", .{@errorName(err)});
                 std.process.exit(1);
             };
+            g_uinput = &uinput;
             break :blk uinput.interface();
         },
         .ydotool => blk: {
@@ -76,6 +97,7 @@ pub fn main(init: std.process.Init) !void {
         evdev.deviceName(), cfg.interval_ms, @tagName(choice.input), @tagName(choice.output),
         if (cfg.suppress) " | suppress" else "",
     });
+    installSignals();
     try z.core.run(evdev.interface(), out_iface, &triggers, cfg.interval_ms, cfg.verbose);
 }
 
