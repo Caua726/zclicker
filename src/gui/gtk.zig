@@ -88,3 +88,35 @@ pub extern fn gtk_css_provider_new() *GtkCssProvider;
 pub extern fn gtk_css_provider_load_from_string(css_provider: *GtkCssProvider, string: [*:0]const u8) void;
 pub extern fn gtk_style_context_add_provider_for_display(display: *GdkDisplay, provider: *GtkStyleProvider, priority: c_uint) void;
 pub extern fn gdk_display_get_default() ?*GdkDisplay;
+
+// --- Redesign bindings (cards, segmented controls, slider, switch, expander) ---
+pub const GtkToggleButton = opaque {};
+pub const GtkScale = opaque {};
+pub const GtkRange = opaque {};
+pub const GtkSwitch = opaque {};
+pub const GtkFrame = opaque {};
+pub const GtkExpander = opaque {};
+
+pub const GTK_ALIGN_FILL: c_int = 0;
+pub const GTK_ALIGN_START: c_int = 1;
+pub const GTK_ALIGN_END: c_int = 2;
+pub const GTK_ALIGN_CENTER: c_int = 3;
+
+pub extern fn gtk_toggle_button_new_with_label(label: [*:0]const u8) *GtkWidget;
+pub extern fn gtk_toggle_button_set_active(button: *GtkToggleButton, is_active: c_int) void;
+pub extern fn gtk_toggle_button_get_active(button: *GtkToggleButton) c_int;
+pub extern fn gtk_toggle_button_set_group(button: *GtkToggleButton, group: ?*GtkToggleButton) void;
+pub extern fn gtk_scale_new_with_range(orientation: c_int, min: f64, max: f64, step: f64) *GtkWidget;
+pub extern fn gtk_range_get_value(range: *GtkRange) f64;
+pub extern fn gtk_range_set_value(range: *GtkRange, value: f64) void;
+pub extern fn gtk_switch_new() *GtkWidget;
+pub extern fn gtk_switch_get_active(self: *GtkSwitch) c_int;
+pub extern fn gtk_switch_set_active(self: *GtkSwitch, is_active: c_int) void;
+pub extern fn gtk_frame_new(label: ?[*:0]const u8) *GtkWidget;
+pub extern fn gtk_frame_set_child(frame: *GtkFrame, child: ?*GtkWidget) void;
+pub extern fn gtk_expander_new(label: ?[*:0]const u8) *GtkWidget;
+pub extern fn gtk_expander_set_child(expander: *GtkExpander, child: ?*GtkWidget) void;
+pub extern fn gtk_expander_set_expanded(expander: *GtkExpander, expanded: c_int) void;
+pub extern fn gtk_widget_set_halign(widget: *GtkWidget, a: c_int) void;
+pub extern fn gtk_widget_set_valign(widget: *GtkWidget, a: c_int) void;
+pub extern fn gtk_widget_set_size_request(widget: *GtkWidget, width: c_int, height: c_int) void;
