@@ -70,3 +70,5 @@ pub extern "user32" fn CallNextHookEx(hhk: ?HHOOK, nCode: c_int, wParam: WPARAM,
 pub extern "user32" fn UnhookWindowsHookEx(hhk: HHOOK) callconv(.winapi) BOOL;
 pub extern "user32" fn GetMessageW(lpMsg: *MSG, hWnd: HWND, wMsgFilterMin: u32, wMsgFilterMax: u32) callconv(.winapi) BOOL;
 pub extern "user32" fn SendInput(cInputs: u32, pInputs: [*]INPUT, cbSize: c_int) callconv(.winapi) u32;
+
+pub extern "kernel32" fn GetModuleFileNameW(hModule: ?*anyopaque, lpFilename: [*]u16, nSize: DWORD) callconv(.winapi) DWORD;

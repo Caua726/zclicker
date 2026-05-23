@@ -82,6 +82,24 @@ pra encontrar o próprio executável). As permissões de `/dev/uinput` continuam
 valendo (veja [Permissões](#permissões)), e a captura de gatilho na GUI lê
 `/dev/input`, então o grupo `input` também é necessário.
 
+### GUI no Windows
+
+No Windows, compile com MSYS2 (mingw-w64) com o GTK4 instalado:
+
+```sh
+zig build -Dgui   # dentro do shell MSYS2/mingw64 com gtk4 disponível
+```
+
+Distribua os DLLs do runtime GTK junto com o executável (use
+`ldd zclicker.exe` ou a ferramenta de empacotamento do MSYS2 para identificá-los).
+
+**Limitações v1 no Windows:** a captura de gatilho ("Rebind") e o dropdown
+de dispositivo não funcionam — use `-b` na CLI para definir os botões-gatilho.
+O global hook do Windows cobre todos os dispositivos automaticamente.
+
+> Nota: este caminho de build não foi testado pelo mantenedor upstream. Se você
+> testou no Windows, abra uma issue ou PR com feedback.
+
 ## Uso
 
 ```sh

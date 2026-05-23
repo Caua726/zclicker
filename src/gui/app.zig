@@ -1,7 +1,10 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const gtk = @import("gtk.zig");
 const command = @import("command.zig");
 const capture = @import("capture.zig");
+
+const win32 = if (builtin.os.tag == .windows) @import("../windows/win32.zig") else struct {};
 
 // evdev button codes used for friendly trigger labels.
 const BTN_LEFT: u16 = 0x110;
@@ -207,14 +210,23 @@ fn readConfig(ui: *Ui) command.Config {
     };
 }
 
-/// Resolve the path of the currently-running executable (reads /proc/self/exe),
-/// so the GUI spawns itself with engine flags.
+/// Resolve the path of the currently-running executable so the GUI spawns itself
+/// with engine flags.
+/// - Linux: reads /proc/self/exe via readlink.
+/// - Windows: calls GetModuleFileNameW and converts to UTF-8.
 fn resolveBin(arena: std.mem.Allocator) []const u8 {
-    var buf: [4096]u8 = undefined;
-    const n = std.os.linux.readlink("/proc/self/exe", &buf, buf.len);
-    const sn = @as(isize, @bitCast(n));
-    if (sn <= 0) return "zclicker";
-    return arena.dupe(u8, buf[0..@intCast(sn)]) catch "zclicker";
+    if (builtin.os.tag == .windows) {
+        var wbuf: [1024]u16 = undefined;
+        const n = win32.GetModuleFileNameW(null, &wbuf, wbuf.len);
+        if (n == 0 or n >= wbuf.len) return "zclicker.exe";
+        return std.unicode.utf16LeToUtf8Alloc(arena, wbuf[0..n]) catch "zclicker.exe";
+    } else {
+        var buf: [4096]u8 = undefined;
+        const n = std.os.linux.readlink("/proc/self/exe", &buf, buf.len);
+        const sn = @as(isize, @bitCast(n));
+        if (sn <= 0) return "zclicker";
+        return arena.dupe(u8, buf[0..@intCast(sn)]) catch "zclicker";
+    }
 }
 
 fn onValueChanged(_: *gtk.GtkRange, data: gtk.gpointer) callconv(.c) void {
@@ -224,8 +236,12 @@ fn onValueChanged(_: *gtk.GtkRange, data: gtk.gpointer) callconv(.c) void {
 
 fn onCapture(_: *gtk.GtkButton, data: gtk.gpointer) callconv(.c) void {
     const ui: *Ui = @ptrCast(@alignCast(data));
-    const code = capture.captureNext() catch {
-        setStatus(ui, "captura falhou (você está no grupo 'input'?)");
+    const code = capture.captureNext() catch |err| {
+        if (err == error.NotSupported) {
+            setStatus(ui, "captura: use -b na CLI por enquanto (Windows v1)");
+        } else {
+            setStatus(ui, "captura falhou (você está no grupo 'input'?)");
+        }
         return;
     };
     ui.codes.append(ui.gpa, code) catch return;

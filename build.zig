@@ -116,7 +116,7 @@ pub fn build(b: *std.Build) void {
     // bare `zig build` stays GTK-free (CLI only). GTK is Linux-only, so force the
     // GUI off on any non-Linux target.
     const gui_enabled = b.option(bool, "gui", "Include the GTK GUI (zclicker opens the GUI when run with no args)") orelse false;
-    const gui_on = gui_enabled and tos == .linux;
+    const gui_on = gui_enabled and (tos == .linux or tos == .windows);
     const build_options = b.addOptions();
     build_options.addOption(bool, "gui", gui_on);
     exe.root_module.addOptions("build_options", build_options);
