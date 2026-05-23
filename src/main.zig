@@ -1,5 +1,6 @@
 const std = @import("std");
 const z = @import("zclicker");
+const select = z.select;
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
@@ -21,6 +22,10 @@ pub fn main(init: std.process.Init) !void {
         try z.LinuxEvdev.listDevices(cfg.buttonCodes());
         return;
     }
+    if (cfg.list_backends) {
+        std.debug.print("input:  evdev\noutput: uinput, ydotool\n", .{});
+        return;
+    }
 
     var evdev = z.LinuxEvdev.init(cfg.device, cfg.buttonCodes()) catch |err| {
         switch (err) {
@@ -38,15 +43,61 @@ pub fn main(init: std.process.Init) !void {
     };
     defer evdev.deinit();
 
-    var ydotool = z.Ydotool.init(io);
+    const env = probeEnv();
+    const choice = select.resolve(env, .{
+        .input = cfg.input,
+        .output = cfg.output,
+        .suppress = cfg.suppress,
+    }) catch |err| {
+        std.debug.print("seleção de backend falhou: {s}\n", .{@errorName(err)});
+        std.process.exit(1);
+    };
+
+    var ydotool: z.Ydotool = undefined;
+    var uinput: z.Uinput = undefined;
+    const out_iface: z.backend.OutputBackend = switch (choice.output) {
+        .uinput => blk: {
+            uinput = z.Uinput.init() catch |err| {
+                std.debug.print("uinput indisponível ({s}); tente --output ydotool ou dê acesso a /dev/uinput.\n", .{@errorName(err)});
+                std.process.exit(1);
+            };
+            break :blk uinput.interface();
+        },
+        .ydotool => blk: {
+            ydotool = z.Ydotool.init(io);
+            break :blk ydotool.interface();
+        },
+        .evdev => unreachable, // evdev is never an output
+    };
+    defer if (choice.output == .uinput) uinput.deinit();
+
     var triggers = z.core.Triggers{ .codes = cfg.buttonCodes() };
+    std.debug.print("zclicker: {s} | {d}ms | in={s} out={s}{s} | Ctrl+C\n", .{
+        evdev.deviceName(), cfg.interval_ms, @tagName(choice.input), @tagName(choice.output),
+        if (cfg.suppress) " | suppress" else "",
+    });
+    try z.core.run(evdev.interface(), out_iface, &triggers, cfg.interval_ms, cfg.verbose);
+}
 
-    std.debug.print(
-        "zclicker: {s} | {d}ms | segure botão 4/5 pra clicar | Ctrl+C pra sair\n",
-        .{ evdev.deviceName(), cfg.interval_ms },
-    );
+fn probeEnv() z.select.Env {
+    var env = z.select.Env{};
+    // /dev/uinput writable?
+    if (z.platform.openRdwr("/dev/uinput")) |fd| {
+        z.platform.closeFd(fd);
+        env.has_uinput = true;
+    } else |_| {}
+    env.has_ydotoold = ydotoolSocketExists();
+    // session is cosmetic for now (resolve ignores it); leave as .unknown.
+    return env;
+}
 
-    try z.core.run(evdev.interface(), ydotool.interface(), &triggers, cfg.interval_ms, cfg.verbose);
+fn ydotoolSocketExists() bool {
+    var buf: [128]u8 = undefined;
+    const uid = std.os.linux.getuid();
+    const path = std.fmt.bufPrintSentinel(&buf, "/run/user/{d}/.ydotool_socket", .{uid}, 0) catch return false;
+    // access(F_OK=0) returns 0 if the path exists. (open() on a socket inode would
+    // wrongly fail with ENXIO, so use access, not open.)
+    return @as(isize, @bitCast(std.os.linux.access(path.ptr, 0))) == 0;
 }
 
 fn printUsage() void {
@@ -59,6 +110,8 @@ fn printUsage() void {
         \\  -d, --device <path>    /dev/input/eventX (padrão: autodetecta)
         \\  -l, --list             lista dispositivos com botões laterais
         \\  -v, --verbose          loga cada gatilho e clique
+        \\      --output <backend> saída: uinput (padrão) ou ydotool
+        \\      --list-backends    lista backends disponíveis
         \\  -h, --help             esta ajuda
         \\
     , .{});

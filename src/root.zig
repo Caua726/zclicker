@@ -6,6 +6,7 @@ pub const cli = @import("cli.zig");
 pub const core = @import("core.zig");
 pub const backend = @import("backend.zig");
 pub const select = @import("select.zig");
+pub const platform = @import("platform/linux.zig");
 
 pub const LinuxEvdev = @import("input/evdev.zig").LinuxEvdev;
 pub const Ydotool = @import("output/ydotool.zig").Ydotool;
