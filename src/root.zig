@@ -12,6 +12,7 @@ pub const LinuxEvdev = @import("input/evdev.zig").LinuxEvdev;
 pub const Ydotool = @import("output/ydotool.zig").Ydotool;
 pub const Uinput = @import("output/uinput.zig").Uinput;
 pub const Wlr = @import("output/wlr.zig").Wlr;
+pub const X11 = @import("output/x11.zig").X11;
 
 test {
     // Pull submodule tests into the `zig build test` run.

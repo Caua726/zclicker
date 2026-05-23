@@ -96,6 +96,8 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.link_libc = true;
     exe.root_module.linkSystemLibrary("wayland-client", .{});
+    exe.root_module.linkSystemLibrary("X11", .{});
+    exe.root_module.linkSystemLibrary("Xtst", .{});
     exe.root_module.addIncludePath(wl_hdr.dirname());
     exe.root_module.addCSourceFile(.{ .file = wl_code });
     exe.root_module.addCSourceFile(.{ .file = b.path("src/output/wlr_shim.c") });

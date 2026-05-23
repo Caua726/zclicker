@@ -51,14 +51,16 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     if (cfg.list_backends) {
-        std.debug.print("input:  evdev\noutput: uinput, ydotool, wlr\n", .{});
+        std.debug.print("input:  evdev\noutput: uinput, ydotool, wlr, x11\n", .{});
         return;
     }
     if (cfg.print_env) {
         const e = probeEnv();
-        // mirror main's auto preference: wlr on Wayland, else uinput, else ydotool.
+        // mirror main's auto preference: wlr on Wayland, x11 on X11, else uinput, else ydotool.
         const auto_out: z.backend.BackendId = if (e.session == .wayland)
             .wlr
+        else if (e.session == .x11)
+            .x11
         else if (e.has_uinput)
             .uinput
         else if (e.has_ydotoold)
@@ -103,32 +105,23 @@ pub fn main(init: std.process.Init) !void {
     var ydotool: z.Ydotool = undefined;
     var uinput: z.Uinput = undefined;
     var wlr: z.Wlr = undefined;
+    var x11: z.X11 = undefined;
 
     // Candidate output backends in priority order. Explicit --output = just that one
-    // (it must work). Auto = prefer wlr on Wayland (native, no daemon/uinput), then
-    // uinput, then ydotool — falling back at runtime if a backend can't initialize.
-    var cands: [3]z.backend.BackendId = undefined;
+    // (it must work). Auto = prefer wlr on Wayland (native, no daemon/uinput), x11
+    // on X11 sessions, then uinput, then ydotool — falling back at runtime if a
+    // backend can't initialize.
+    var cands: [4]z.backend.BackendId = undefined;
     var nc: usize = 0;
     if (cfg.output) |forced| {
         cands[0] = forced;
         nc = 1;
     } else {
-        if (env.session == .wayland) {
-            cands[nc] = .wlr;
-            nc += 1;
-        }
-        if (env.has_uinput) {
-            cands[nc] = .uinput;
-            nc += 1;
-        }
-        if (env.has_ydotoold) {
-            cands[nc] = .ydotool;
-            nc += 1;
-        }
-        if (nc == 0) { // optimistic last resort
-            cands[nc] = .uinput;
-            nc += 1;
-        }
+        if (env.session == .wayland) { cands[nc] = .wlr; nc += 1; }
+        if (env.session == .x11) { cands[nc] = .x11; nc += 1; }
+        if (env.has_uinput) { cands[nc] = .uinput; nc += 1; }
+        if (env.has_ydotoold) { cands[nc] = .ydotool; nc += 1; }
+        if (nc == 0) { cands[nc] = .uinput; nc += 1; }
     }
 
     var out_iface: z.backend.OutputBackend = undefined;
@@ -155,6 +148,12 @@ pub fn main(init: std.process.Init) !void {
                 chosen = .ydotool;
                 ok = true;
             },
+            .x11 => {
+                x11 = z.X11.init(cfg.click) catch continue;
+                out_iface = x11.interface();
+                chosen = .x11;
+                ok = true;
+            },
             .evdev => continue, // evdev is never an output
         }
         if (ok) break;
@@ -168,6 +167,7 @@ pub fn main(init: std.process.Init) !void {
     defer switch (chosen) {
         .uinput => uinput.deinit(),
         .wlr => wlr.deinit(),
+        .x11 => x11.deinit(),
         else => {},
     };
 

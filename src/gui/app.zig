@@ -189,6 +189,7 @@ fn readConfig(ui: *Ui) command.Config {
         1 => .uinput,
         2 => .ydotool,
         3 => .wlr,
+        4 => .x11,
         else => .auto,
     };
     const ms: i64 = @intFromFloat(gtk.gtk_range_get_value(@ptrCast(ui.interval)));
@@ -396,7 +397,7 @@ fn onActivate(app: *gtk.GtkApplication, _: gtk.gpointer) callconv(.c) void {
 
     const out_row = row();
     gtk.gtk_box_append(@ptrCast(out_row), dimLabel("Output backend"));
-    const output = gtk.gtk_drop_down_new_from_strings(&[_]?[*:0]const u8{ "auto", "uinput", "ydotool", "wlr", null });
+    const output = gtk.gtk_drop_down_new_from_strings(&[_]?[*:0]const u8{ "auto", "uinput", "ydotool", "wlr", "x11", null });
     gtk.gtk_widget_set_hexpand(output, 1);
     gtk.gtk_widget_set_halign(output, gtk.GTK_ALIGN_END);
     gtk.gtk_box_append(@ptrCast(out_row), output);

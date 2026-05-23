@@ -14,6 +14,7 @@ pub const BackendId = enum {
     uinput, // native uinput output backend (default)
     ydotool,
     wlr, // wlroots zwlr_virtual_pointer_v1 (Wayland native, no daemon)
+    x11, // X11 XTest extension
     pub fn parse(s: []const u8) ?BackendId {
         inline for (@typeInfo(BackendId).@"enum".fields) |f| {
             if (std.mem.eql(u8, s, f.name)) return @field(BackendId, f.name);
@@ -54,6 +55,10 @@ pub const ClickButton = enum {
             .right => lx.BTN_RIGHT,
             .middle => lx.BTN_MIDDLE,
         };
+    }
+    /// X11 XTest button number: left=1, middle=2, right=3.
+    pub fn x11Button(self: ClickButton) c_uint {
+        return switch (self) { .left => 1, .middle => 2, .right => 3 };
     }
     /// ydotool hex button code: low nibble = button, 0x40 down + 0x80 up.
     pub fn ydotoolHex(self: ClickButton) []const u8 {

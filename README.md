@@ -22,10 +22,11 @@ Funciona no **Wayland** porque lê os botões direto da camada de input do kerne
 | Output | `uinput` | **Padrão.** Sem daemon; precisa de acesso a `/dev/uinput` |
 | Output | `ydotool`| Fallback; precisa do `ydotoold` rodando                 |
 | Output | `wlr`    | wlroots virtual pointer (Hyprland/Sway, no daemon)      |
+| Output | `x11`    | X11 XTest extension (`XTestFakeButtonEvent`)             |
 
-**Seleção automática:** prefere `uinput`; cai para `ydotool` se `/dev/uinput`
-não estiver acessível. Use `--input` / `--output` para forçar um backend, ou
-`--list-backends` para ver os disponíveis.
+**Seleção automática:** prefere `wlr` em sessões Wayland, `x11` em sessões X11,
+depois `uinput`, depois `ydotool`. Use `--input` / `--output` para forçar um
+backend, ou `--list-backends` para ver os disponíveis.
 
 ## Requisitos
 
@@ -33,6 +34,8 @@ não estiver acessível. Use `--input` / `--output` para forçar um backend, ou
   versões diferentes do master podem não compilar).
 - **Dependências de build:** `wayland-client` + `wayland-scanner` (o backend `wlr`
   é sempre compilado no engine, então até um `zig build` simples precisa delas).
+  `libX11` + `libXtst` (o backend `x11` também é sempre compilado; instale
+  `libx11-dev` / `xorg-x11-libXtst-devel` ou equivalente na sua distro).
 - Seu usuário no grupo `input` (pra ler `/dev/input/eventX`).
 - **Backend uinput (padrão):** acesso de escrita a `/dev/uinput`. Instale a
   regra udev (veja [Permissões](#permissões)) ou rode com `sudo`.
@@ -144,5 +147,5 @@ threads nem locks.
 
 1. ~~**Supressão de navegação** — capturar o mouse (`EVIOCGRAB`) e re-injetar tudo
    via `uinput` menos os botões 4/5, pra eles não dispararem voltar/avançar.~~ ✅ feito
-2. **X11** — backend de saída via XTest.
+2. ~~**X11** — backend de saída via XTest.~~ ✅ feito
 3. **Windows** — input via Raw Input, saída via `SendInput`.
