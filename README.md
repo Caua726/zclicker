@@ -43,6 +43,24 @@ zig build              # binário em zig-out/bin/zclicker
 zig build test         # roda os testes
 ```
 
+## GUI
+
+Janela nativa **GTK4** (`zclicker-gui`) que monta as opções e roda o CLI por baixo.
+
+```sh
+zig build -Dgui                  # compila a GUI (precisa das libs de dev do GTK4)
+./zig-out/bin/zclicker-gui       # abre a janela
+# ou:
+zig build gui                    # compila e abre a janela
+```
+
+A GUI **spawna o binário `zclicker`** para fazer o clique de fato. Ela procura o
+`zclicker` ao lado do próprio executável (`zig build -Dgui` instala os dois em
+`zig-out/bin/`); se mover a GUI, mantenha o `zclicker` junto ou no `PATH`. As
+permissões de `/dev/uinput` continuam valendo (veja [Permissões](#permissões)),
+e a captura de gatilho na GUI lê `/dev/input`, então o grupo `input` também é
+necessário.
+
 ## Uso
 
 ```sh
