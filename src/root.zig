@@ -14,4 +14,5 @@ test {
     // Pull submodule tests into the `zig build test` run.
     _ = cli;
     _ = core;
+    _ = @import("platform/linux.zig");
 }
