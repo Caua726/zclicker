@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const backend = @import("backend.zig");
 const Id = backend.BackendId;
 
@@ -7,6 +8,7 @@ pub const Session = enum { wayland, x11, unknown };
 /// Snapshot of the environment relevant to backend choice. Filled by `probe`
 /// in main; constructed directly in tests.
 pub const Env = struct {
+    os: std.Target.Os.Tag = builtin.os.tag,
     session: Session = .unknown,
     has_uinput: bool = false, // /dev/uinput writable
     has_ydotoold: bool = false, // ydotool socket present

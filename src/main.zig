@@ -45,6 +45,16 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("input:  evdev\noutput: uinput, ydotool\n", .{});
         return;
     }
+    if (cfg.print_env) {
+        const e = probeEnv();
+        const c = select.resolve(e, .{}) catch select.Choice{ .input = .evdev, .output = .uinput };
+        std.debug.print("os: {s}\nsession: {s}\nuinput: {s}\nydotoold: {s}\nauto-output: {s}\n", .{
+            @tagName(e.os),                    @tagName(e.session),
+            if (e.has_uinput) "yes" else "no", if (e.has_ydotoold) "yes" else "no",
+            @tagName(c.output),
+        });
+        return;
+    }
 
     var evdev = z.LinuxEvdev.init(cfg.device, cfg.buttonCodes(), cfg.suppress) catch |err| {
         switch (err) {
@@ -94,9 +104,8 @@ pub fn main(init: std.process.Init) !void {
 
     var triggers = z.core.Triggers{ .codes = cfg.buttonCodes() };
     std.debug.print(
-        "zclicker: {s} ({d} disp.) | {d}ms | {s} | clica={s} | in={s} out={s}{s} | Ctrl+C\n",
-        .{ evdev.deviceName(), evdev.deviceCount(), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click),
-           @tagName(choice.input), @tagName(choice.output), if (cfg.suppress) " | suppress" else "" },
+        "zclicker: {s} ({d} disp.) | {s}/{s} | {d}ms | {s} | clica={s} | in={s} out={s}{s} | Ctrl+C\n",
+        .{ evdev.deviceName(), evdev.deviceCount(), @tagName(env.os), @tagName(env.session), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click), @tagName(choice.input), @tagName(choice.output), if (cfg.suppress) " | suppress" else "" },
     );
     installSignals();
     try z.core.run(evdev.interface(), out_iface, &triggers, cfg.mode, cfg.interval_ms, cfg.verbose);
@@ -110,8 +119,20 @@ fn probeEnv() z.select.Env {
         env.has_uinput = true;
     } else |_| {}
     env.has_ydotoold = ydotoolSocketExists();
-    // session is cosmetic for now (resolve ignores it); leave as .unknown.
+    env.session = detectSession();
     return env;
+}
+
+/// Best-effort session detection from runtime sockets (this std has no getenv).
+fn detectSession() z.select.Session {
+    const uid = std.os.linux.getuid();
+    var buf: [128]u8 = undefined;
+    inline for (.{ "wayland-0", "wayland-1" }) |name| {
+        const p = std.fmt.bufPrintSentinel(&buf, "/run/user/{d}/{s}", .{ uid, name }, 0) catch return .unknown;
+        if (@as(isize, @bitCast(std.os.linux.access(p.ptr, 0))) == 0) return .wayland;
+    }
+    if (@as(isize, @bitCast(std.os.linux.access("/tmp/.X11-unix/X0", 0))) == 0) return .x11;
+    return .unknown;
 }
 
 fn ydotoolSocketExists() bool {
@@ -137,6 +158,7 @@ fn printUsage() void {
         \\      --input <backend>  entrada: evdev
         \\      --output <backend> saída: uinput (padrão) ou ydotool
         \\      --list-backends    lista backends disponíveis
+        \\      --print-env        mostra SO/sessão detectados e o backend automático
         \\      --click <btn>      botão clicado: left (padrão), right, middle
         \\      --mode <modo>      hold (padrão, segurar) ou toggle (alternar)
         \\  -h, --help             esta ajuda

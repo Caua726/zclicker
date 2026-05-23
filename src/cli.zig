@@ -14,6 +14,7 @@ pub const Config = struct {
     output: ?backend.BackendId = null,
     suppress: bool = false,
     list_backends: bool = false,
+    print_env: bool = false,
     click: backend.ClickButton = .left,
     mode: backend.Mode = .hold,
 
@@ -95,6 +96,8 @@ pub fn parse(args: []const [:0]const u8) Error!Config {
             cfg.suppress = true;
         } else if (eq(a, "--list-backends")) {
             cfg.list_backends = true;
+        } else if (eq(a, "--print-env")) {
+            cfg.print_env = true;
         } else if (eq(a, "--click")) {
             i += 1;
             if (i >= args.len) return Error.MissingValue;
