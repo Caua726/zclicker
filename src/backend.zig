@@ -1,5 +1,5 @@
 const std = @import("std");
-const lx = @import("platform/linux.zig");
+const lx = @import("codes.zig");
 
 pub const BTN_SIDE = lx.BTN_SIDE;
 pub const BTN_EXTRA = lx.BTN_EXTRA;

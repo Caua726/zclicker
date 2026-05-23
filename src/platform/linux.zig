@@ -1,16 +1,14 @@
 const std = @import("std");
+const codes = @import("../codes.zig");
 
-pub const EV_SYN: u16 = 0x00;
-pub const EV_KEY: u16 = 0x01;
-pub const EV_REL: u16 = 0x02;
-pub const EV_MSC: u16 = 0x04;
-pub const SYN_REPORT: u16 = 0x00;
-
-pub const BTN_LEFT: u16 = 0x110;
-pub const BTN_SIDE: u16 = 0x113;
-pub const BTN_EXTRA: u16 = 0x114;
-
-pub const KEY_MAX: usize = 0x2ff;
+// Re-export the platform-neutral evdev constants so existing `lx.*` users keep
+// working. The pure definitions live in src/codes.zig (no syscalls).
+pub const EV_SYN = codes.EV_SYN;
+pub const EV_KEY = codes.EV_KEY;
+pub const EV_REL = codes.EV_REL;
+pub const EV_MSC = codes.EV_MSC;
+pub const SYN_REPORT = codes.SYN_REPORT;
+pub const KEY_MAX = codes.KEY_MAX;
 
 /// evdev `struct input_event` on 64-bit Linux (sizeof == 24).
 pub const InputEvent = extern struct {
@@ -85,17 +83,20 @@ pub fn testBit(bits: []const u8, n: usize) bool {
 }
 
 // --- additional input codes (used by the suppression passthrough) ---
-pub const BTN_RIGHT: u16 = 0x111;
-pub const BTN_MIDDLE: u16 = 0x112;
-pub const BTN_FORWARD: u16 = 0x115;
-pub const BTN_BACK: u16 = 0x116;
-pub const BTN_TASK: u16 = 0x117;
-pub const REL_X: u16 = 0x00;
-pub const REL_Y: u16 = 0x01;
-pub const REL_HWHEEL: u16 = 0x06;
-pub const REL_WHEEL: u16 = 0x08;
-pub const REL_WHEEL_HI_RES: u16 = 0x0b;
-pub const REL_HWHEEL_HI_RES: u16 = 0x0c;
+pub const BTN_LEFT = codes.BTN_LEFT;
+pub const BTN_RIGHT = codes.BTN_RIGHT;
+pub const BTN_MIDDLE = codes.BTN_MIDDLE;
+pub const BTN_SIDE = codes.BTN_SIDE;
+pub const BTN_EXTRA = codes.BTN_EXTRA;
+pub const BTN_FORWARD = codes.BTN_FORWARD;
+pub const BTN_BACK = codes.BTN_BACK;
+pub const BTN_TASK = codes.BTN_TASK;
+pub const REL_X = codes.REL_X;
+pub const REL_Y = codes.REL_Y;
+pub const REL_HWHEEL = codes.REL_HWHEEL;
+pub const REL_WHEEL = codes.REL_WHEEL;
+pub const REL_WHEEL_HI_RES = codes.REL_WHEEL_HI_RES;
+pub const REL_HWHEEL_HI_RES = codes.REL_HWHEEL_HI_RES;
 
 // --- uinput device creation (shared by the uinput output backend and the suppression passthrough) ---
 const UINPUT_MAX_NAME_SIZE = 80;

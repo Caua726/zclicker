@@ -1,6 +1,6 @@
 const std = @import("std");
 const backend = @import("backend.zig");
-const lx = @import("platform/linux.zig");
+const lx = @import("codes.zig");
 
 pub const Config = struct {
     interval_ms: i32 = 50,

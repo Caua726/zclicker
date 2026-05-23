@@ -2,23 +2,31 @@
 //! these pieces, and future platform backends plug in alongside the existing
 //! ones without touching the core loop.
 
+const builtin = @import("builtin");
+const is_linux = builtin.os.tag == .linux;
+
+// Platform-neutral modules — always available.
 pub const cli = @import("cli.zig");
 pub const core = @import("core.zig");
 pub const backend = @import("backend.zig");
 pub const select = @import("select.zig");
-pub const platform = @import("platform/linux.zig");
+pub const codes = @import("codes.zig");
 
-pub const LinuxEvdev = @import("input/evdev.zig").LinuxEvdev;
-pub const Ydotool = @import("output/ydotool.zig").Ydotool;
-pub const Uinput = @import("output/uinput.zig").Uinput;
-pub const Wlr = @import("output/wlr.zig").Wlr;
-pub const X11 = @import("output/x11.zig").X11;
+// Linux-only modules. The `if (is_linux) @import(...) else struct{}/void`
+// pattern means the untaken comptime branch is never analyzed, so these
+// Linux-only files don't have to compile on non-Linux targets.
+pub const platform = if (is_linux) @import("platform/linux.zig") else struct {};
+pub const LinuxEvdev = if (is_linux) @import("input/evdev.zig").LinuxEvdev else void;
+pub const Ydotool = if (is_linux) @import("output/ydotool.zig").Ydotool else void;
+pub const Uinput = if (is_linux) @import("output/uinput.zig").Uinput else void;
+pub const Wlr = if (is_linux) @import("output/wlr.zig").Wlr else void;
+pub const X11 = if (is_linux) @import("output/x11.zig").X11 else void;
 
 test {
-    // Pull submodule tests into the `zig build test` run.
+    // Pull neutral submodule tests into the `zig build test` run (always Linux here).
     _ = cli;
     _ = core;
-    _ = @import("platform/linux.zig");
-    _ = @import("select.zig");
-    _ = @import("backend.zig");
+    _ = backend;
+    _ = select;
+    _ = codes;
 }

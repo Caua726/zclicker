@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const z = @import("zclicker");
 const select = z.select;
 const build_options = @import("build_options");
@@ -24,6 +25,17 @@ fn installSignals() void {
 }
 
 pub fn main(init: std.process.Init) !void {
+    // The comptime-known `builtin.os.tag` ensures only the matching branch is
+    // compiled, so the Linux-only `linuxMain` body is never analyzed on Windows
+    // (and the Windows stub is never analyzed on Linux).
+    if (builtin.os.tag == .windows) {
+        return @import("windows/run.zig").run(init);
+    } else {
+        return linuxMain(init);
+    }
+}
+
+fn linuxMain(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const io = init.io;
 

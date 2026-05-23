@@ -83,33 +83,44 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // wlr-virtual-pointer backend: generate protocol glue with wayland-scanner and
-    // compile the C shim into the main exe. This makes the wlr backend ALWAYS part
-    // of the engine, so a plain `zig build` now needs wayland-client + wayland-scanner.
-    const wl_xml = b.path("protocols/wlr-virtual-pointer-unstable-v1.xml");
-    const wl_hdr_cmd = b.addSystemCommand(&.{ "wayland-scanner", "client-header" });
-    wl_hdr_cmd.addFileArg(wl_xml);
-    const wl_hdr = wl_hdr_cmd.addOutputFileArg("wlr-virtual-pointer-unstable-v1-client-protocol.h");
-    const wl_code_cmd = b.addSystemCommand(&.{ "wayland-scanner", "private-code" });
-    wl_code_cmd.addFileArg(wl_xml);
-    const wl_code = wl_code_cmd.addOutputFileArg("wlr-virtual-pointer-unstable-v1-protocol.c");
+    // Per-OS wiring. The Linux backends (wlr/X11/uinput) need wayland-scanner,
+    // a C shim, and system libs; none of that exists on a Windows target.
+    const tos = target.result.os.tag;
 
-    exe.root_module.link_libc = true;
-    exe.root_module.linkSystemLibrary("wayland-client", .{});
-    exe.root_module.linkSystemLibrary("X11", .{});
-    exe.root_module.linkSystemLibrary("Xtst", .{});
-    exe.root_module.addIncludePath(wl_hdr.dirname());
-    exe.root_module.addCSourceFile(.{ .file = wl_code });
-    exe.root_module.addCSourceFile(.{ .file = b.path("src/output/wlr_shim.c") });
+    if (tos == .linux) {
+        // wlr-virtual-pointer backend: generate protocol glue with wayland-scanner
+        // and compile the C shim into the main exe. This makes the wlr backend part
+        // of the engine, so a Linux `zig build` needs wayland-client + wayland-scanner.
+        const wl_xml = b.path("protocols/wlr-virtual-pointer-unstable-v1.xml");
+        const wl_hdr_cmd = b.addSystemCommand(&.{ "wayland-scanner", "client-header" });
+        wl_hdr_cmd.addFileArg(wl_xml);
+        const wl_hdr = wl_hdr_cmd.addOutputFileArg("wlr-virtual-pointer-unstable-v1-client-protocol.h");
+        const wl_code_cmd = b.addSystemCommand(&.{ "wayland-scanner", "private-code" });
+        wl_code_cmd.addFileArg(wl_xml);
+        const wl_code = wl_code_cmd.addOutputFileArg("wlr-virtual-pointer-unstable-v1-protocol.c");
+
+        exe.root_module.link_libc = true;
+        exe.root_module.linkSystemLibrary("wayland-client", .{});
+        exe.root_module.linkSystemLibrary("X11", .{});
+        exe.root_module.linkSystemLibrary("Xtst", .{});
+        exe.root_module.addIncludePath(wl_hdr.dirname());
+        exe.root_module.addCSourceFile(.{ .file = wl_code });
+        exe.root_module.addCSourceFile(.{ .file = b.path("src/output/wlr_shim.c") });
+    } else if (tos == .windows) {
+        // Stage 2 will use user32 for WH_MOUSE_LL / SendInput. Harmless now.
+        exe.root_module.linkSystemLibrary("user32", .{});
+    }
 
     // GTK GUI toggle: `zig build -Dgui` folds the GUI into the main exe.
     // When gui_enabled=true, bare `zclicker` (no args) opens the GTK window;
-    // bare `zig build` stays GTK-free (CLI only).
+    // bare `zig build` stays GTK-free (CLI only). GTK is Linux-only, so force the
+    // GUI off on any non-Linux target.
     const gui_enabled = b.option(bool, "gui", "Include the GTK GUI (zclicker opens the GUI when run with no args)") orelse false;
+    const gui_on = gui_enabled and tos == .linux;
     const build_options = b.addOptions();
-    build_options.addOption(bool, "gui", gui_enabled);
+    build_options.addOption(bool, "gui", gui_on);
     exe.root_module.addOptions("build_options", build_options);
-    if (gui_enabled) {
+    if (gui_on) {
         exe.root_module.link_libc = true;
         exe.root_module.linkSystemLibrary("gtk4", .{});
     }
