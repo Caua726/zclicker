@@ -56,11 +56,19 @@ pub fn main(init: std.process.Init) !void {
     }
     if (cfg.print_env) {
         const e = probeEnv();
-        const c = select.resolve(e, .{}) catch select.Choice{ .input = .evdev, .output = .uinput };
+        // mirror main's auto preference: wlr on Wayland, else uinput, else ydotool.
+        const auto_out: z.backend.BackendId = if (e.session == .wayland)
+            .wlr
+        else if (e.has_uinput)
+            .uinput
+        else if (e.has_ydotoold)
+            .ydotool
+        else
+            .uinput;
         std.debug.print("os: {s}\nsession: {s}\nuinput: {s}\nydotoold: {s}\nauto-output: {s}\n", .{
             @tagName(e.os),                    @tagName(e.session),
             if (e.has_uinput) "yes" else "no", if (e.has_ydotoold) "yes" else "no",
-            @tagName(c.output),
+            @tagName(auto_out),
         });
         return;
     }
@@ -95,35 +103,78 @@ pub fn main(init: std.process.Init) !void {
     var ydotool: z.Ydotool = undefined;
     var uinput: z.Uinput = undefined;
     var wlr: z.Wlr = undefined;
-    const out_iface: z.backend.OutputBackend = switch (choice.output) {
-        .uinput => blk: {
-            uinput = z.Uinput.init(cfg.click) catch |err| {
-                std.debug.print("uinput indisponível ({s}); tente --output ydotool ou dê acesso a /dev/uinput.\n", .{@errorName(err)});
-                std.process.exit(1);
-            };
-            g_uinput = &uinput;
-            break :blk uinput.interface();
-        },
-        .ydotool => blk: {
-            ydotool = z.Ydotool.init(io, cfg.click);
-            break :blk ydotool.interface();
-        },
-        .wlr => blk: {
-            wlr = z.Wlr.init(cfg.click) catch |err| {
-                std.debug.print("wlr indisponível ({s}); o compositor suporta zwlr_virtual_pointer? tente --output uinput.\n", .{@errorName(err)});
-                std.process.exit(1);
-            };
-            break :blk wlr.interface();
-        },
-        .evdev => unreachable, // evdev is never an output
+
+    // Candidate output backends in priority order. Explicit --output = just that one
+    // (it must work). Auto = prefer wlr on Wayland (native, no daemon/uinput), then
+    // uinput, then ydotool — falling back at runtime if a backend can't initialize.
+    var cands: [3]z.backend.BackendId = undefined;
+    var nc: usize = 0;
+    if (cfg.output) |forced| {
+        cands[0] = forced;
+        nc = 1;
+    } else {
+        if (env.session == .wayland) {
+            cands[nc] = .wlr;
+            nc += 1;
+        }
+        if (env.has_uinput) {
+            cands[nc] = .uinput;
+            nc += 1;
+        }
+        if (env.has_ydotoold) {
+            cands[nc] = .ydotool;
+            nc += 1;
+        }
+        if (nc == 0) { // optimistic last resort
+            cands[nc] = .uinput;
+            nc += 1;
+        }
+    }
+
+    var out_iface: z.backend.OutputBackend = undefined;
+    var chosen: z.backend.BackendId = .uinput;
+    var ok = false;
+    for (cands[0..nc]) |cand| {
+        switch (cand) {
+            .wlr => {
+                wlr = z.Wlr.init(cfg.click) catch continue;
+                out_iface = wlr.interface();
+                chosen = .wlr;
+                ok = true;
+            },
+            .uinput => {
+                uinput = z.Uinput.init(cfg.click) catch continue;
+                g_uinput = &uinput;
+                out_iface = uinput.interface();
+                chosen = .uinput;
+                ok = true;
+            },
+            .ydotool => {
+                ydotool = z.Ydotool.init(io, cfg.click);
+                out_iface = ydotool.interface();
+                chosen = .ydotool;
+                ok = true;
+            },
+            .evdev => continue, // evdev is never an output
+        }
+        if (ok) break;
+    }
+    if (!ok) {
+        std.debug.print("nenhum backend de saída disponível (tentei:", .{});
+        for (cands[0..nc]) |c| std.debug.print(" {s}", .{@tagName(c)});
+        std.debug.print(") — cheque /dev/uinput, o ydotoold, ou o suporte do compositor.\n", .{});
+        std.process.exit(1);
+    }
+    defer switch (chosen) {
+        .uinput => uinput.deinit(),
+        .wlr => wlr.deinit(),
+        else => {},
     };
-    defer if (choice.output == .uinput) uinput.deinit();
-    defer if (choice.output == .wlr) wlr.deinit();
 
     var triggers = z.core.Triggers{ .codes = cfg.buttonCodes() };
     std.debug.print(
         "zclicker: {s} ({d} disp.) | {s}/{s} | {d}ms | {s} | clica={s} | in={s} out={s}{s} | Ctrl+C\n",
-        .{ evdev.deviceName(), evdev.deviceCount(), @tagName(env.os), @tagName(env.session), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click), @tagName(choice.input), @tagName(choice.output), if (cfg.suppress) " | suppress" else "" },
+        .{ evdev.deviceName(), evdev.deviceCount(), @tagName(env.os), @tagName(env.session), cfg.interval_ms, @tagName(cfg.mode), @tagName(cfg.click), @tagName(choice.input), @tagName(chosen), if (cfg.suppress) " | suppress" else "" },
     );
     installSignals();
     try z.core.run(evdev.interface(), out_iface, &triggers, cfg.mode, cfg.interval_ms, cfg.verbose);
