@@ -51,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     if (cfg.list_backends) {
-        std.debug.print("input:  evdev\noutput: uinput, ydotool\n", .{});
+        std.debug.print("input:  evdev\noutput: uinput, ydotool, wlr\n", .{});
         return;
     }
     if (cfg.print_env) {
@@ -94,6 +94,7 @@ pub fn main(init: std.process.Init) !void {
 
     var ydotool: z.Ydotool = undefined;
     var uinput: z.Uinput = undefined;
+    var wlr: z.Wlr = undefined;
     const out_iface: z.backend.OutputBackend = switch (choice.output) {
         .uinput => blk: {
             uinput = z.Uinput.init(cfg.click) catch |err| {
@@ -107,9 +108,17 @@ pub fn main(init: std.process.Init) !void {
             ydotool = z.Ydotool.init(io, cfg.click);
             break :blk ydotool.interface();
         },
+        .wlr => blk: {
+            wlr = z.Wlr.init(cfg.click) catch |err| {
+                std.debug.print("wlr indisponível ({s}); o compositor suporta zwlr_virtual_pointer? tente --output uinput.\n", .{@errorName(err)});
+                std.process.exit(1);
+            };
+            break :blk wlr.interface();
+        },
         .evdev => unreachable, // evdev is never an output
     };
     defer if (choice.output == .uinput) uinput.deinit();
+    defer if (choice.output == .wlr) wlr.deinit();
 
     var triggers = z.core.Triggers{ .codes = cfg.buttonCodes() };
     std.debug.print(

@@ -11,6 +11,7 @@ pub const platform = @import("platform/linux.zig");
 pub const LinuxEvdev = @import("input/evdev.zig").LinuxEvdev;
 pub const Ydotool = @import("output/ydotool.zig").Ydotool;
 pub const Uinput = @import("output/uinput.zig").Uinput;
+pub const Wlr = @import("output/wlr.zig").Wlr;
 
 test {
     // Pull submodule tests into the `zig build test` run.

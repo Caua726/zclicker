@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const Mode = enum { hold, toggle };
 pub const Click = enum { left, right, middle };
-pub const Output = enum { auto, uinput, ydotool };
+pub const Output = enum { auto, uinput, ydotool, wlr };
 
 pub const Config = struct {
     interval_ms: u32 = 50,

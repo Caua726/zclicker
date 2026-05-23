@@ -21,6 +21,7 @@ Funciona no **Wayland** porque lê os botões direto da camada de input do kerne
 | Input  | `evdev`  | Universal, lê `/dev/input/eventX` direto do kernel      |
 | Output | `uinput` | **Padrão.** Sem daemon; precisa de acesso a `/dev/uinput` |
 | Output | `ydotool`| Fallback; precisa do `ydotoold` rodando                 |
+| Output | `wlr`    | wlroots virtual pointer (Hyprland/Sway, no daemon)      |
 
 **Seleção automática:** prefere `uinput`; cai para `ydotool` se `/dev/uinput`
 não estiver acessível. Use `--input` / `--output` para forçar um backend, ou
@@ -30,6 +31,8 @@ não estiver acessível. Use `--input` / `--output` para forçar um backend, ou
 
 - Zig `0.17.0-dev.305+bdfbf432d` (essa build usa a nova interface `Io` da std;
   versões diferentes do master podem não compilar).
+- **Dependências de build:** `wayland-client` + `wayland-scanner` (o backend `wlr`
+  é sempre compilado no engine, então até um `zig build` simples precisa delas).
 - Seu usuário no grupo `input` (pra ler `/dev/input/eventX`).
 - **Backend uinput (padrão):** acesso de escrita a `/dev/uinput`. Instale a
   regra udev (veja [Permissões](#permissões)) ou rode com `sudo`.

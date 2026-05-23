@@ -13,6 +13,7 @@ pub const BackendId = enum {
     evdev,
     uinput, // native uinput output backend (default)
     ydotool,
+    wlr, // wlroots zwlr_virtual_pointer_v1 (Wayland native, no daemon)
     pub fn parse(s: []const u8) ?BackendId {
         inline for (@typeInfo(BackendId).@"enum".fields) |f| {
             if (std.mem.eql(u8, s, f.name)) return @field(BackendId, f.name);
