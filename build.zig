@@ -157,26 +157,6 @@ pub fn build(b: *std.Build) void {
     // --- GTK4 GUI (optional, only built with -Dgui or the `gui` step) ---
 
     const gui_enabled = b.option(bool, "gui", "Build the GTK GUI (zclicker-gui)") orelse false;
-
-    // Translate gtk/gtk.h into a Zig module via translate-c (replaces @cImport).
-    const gtk_translate = b.addTranslateC(.{
-        .root_source_file = b.path("src/gui/gtk.h"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    gtk_translate.linkSystemLibrary("gtk4", .{});
-    // fakeinc2/glib/gmacros.h patches out _Pragma-based deprecation macros
-    // that zig translate-c cannot parse. Must come before system includes.
-    // GTK pkg-config adds /usr/include/glib-2.0 to -I; our fake adds
-    // src/gui/fakeinc2 first so <glib/gmacros.h> resolves to our patched copy.
-    gtk_translate.addIncludePath(b.path("src/gui/fakeinc2"));
-
-    const gtk_module = gtk_translate.createModule();
-    // Also link gtk4 and libc into the module so downstream sees the symbols.
-    gtk_module.linkSystemLibrary("gtk4", .{});
-    gtk_module.link_libc = true;
-
     const gui_exe = b.addExecutable(.{
         .name = "zclicker-gui",
         .root_module = b.createModule(.{
@@ -186,12 +166,10 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    gui_exe.root_module.addImport("gtk", gtk_module);
     gui_exe.root_module.linkSystemLibrary("gtk4", .{});
     if (gui_enabled) b.installArtifact(gui_exe);
-
     const gui_run = b.addRunArtifact(gui_exe);
-    gui_run.step.dependOn(b.getInstallStep()); // ensures the `zclicker` CLI is built for the GUI to spawn
+    gui_run.step.dependOn(b.getInstallStep());
     if (b.args) |args| gui_run.addArgs(args);
     const gui_step = b.step("gui", "Build and run the GTK GUI");
     gui_step.dependOn(&gui_run.step);
