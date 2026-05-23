@@ -133,6 +133,29 @@ pub const LinuxEvdev = struct {
         return self.nextEvent(timeout_ms);
     }
 
+    /// The physical device went away (unplugged). Close it, then block-retry until a
+    /// matching device reappears, re-grabbing if we were suppressing. The passthrough
+    /// uinput device is left intact.
+    fn reopen(self: *LinuxEvdev) void {
+        if (self.fd >= 0) {
+            if (self.suppress) _ = std.os.linux.ioctl(self.fd, EVIOCGRAB, 0);
+            closeFd(self.fd);
+            self.fd = -1;
+        }
+        std.debug.print("[zclicker] mouse desconectado; aguardando reconexão...\n", .{});
+        while (true) {
+            self.fd = findDevice(self.codes) catch {
+                var ts: std.os.linux.timespec = .{ .sec = 0, .nsec = 500 * std.time.ns_per_ms };
+                _ = std.os.linux.nanosleep(&ts, null);
+                continue;
+            };
+            if (self.suppress) _ = std.os.linux.ioctl(self.fd, EVIOCGRAB, 1);
+            self.name_len = nameInto(self.fd, &self.name_buf);
+            std.debug.print("[zclicker] mouse reconectado: {s}\n", .{self.deviceName()});
+            return;
+        }
+    }
+
     fn nextEvent(self: *LinuxEvdev, timeout_ms: i32) !?TriggerEvent {
         if (self.popPending()) |ev| return ev;
 
@@ -149,8 +172,16 @@ pub const LinuxEvdev = struct {
                 .events = std.posix.POLL.IN,
                 .revents = 0,
             }};
-            if (try std.posix.poll(&fds, remaining) == 0) return null; // timed out
-            try self.fill();
+            const n = try std.posix.poll(&fds, remaining);
+            if ((@as(i16, fds[0].revents) & @as(i16, std.posix.POLL.ERR | std.posix.POLL.HUP | std.posix.POLL.NVAL)) != 0) {
+                self.reopen();
+                continue;
+            }
+            if (n == 0) return null; // timed out
+            self.fill() catch {
+                self.reopen();
+                continue;
+            };
             if (self.popPending()) |ev| return ev;
             // Only non-trigger events (movement, scroll) arrived; keep waiting.
         }
