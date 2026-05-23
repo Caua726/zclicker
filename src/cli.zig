@@ -1,5 +1,6 @@
 const std = @import("std");
 const backend = @import("backend.zig");
+const lx = @import("platform/linux.zig");
 
 pub const Config = struct {
     interval_ms: i32 = 50,
@@ -27,12 +28,18 @@ fn eq(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
 }
 
-/// Map a human-facing button number to its evdev code. Buttons 4/5 are the side
-/// buttons. Extend here as more triggers become useful.
+/// Map a trigger token to an evdev code. Accepts named aliases (mouse buttons) or a
+/// raw decimal evdev code (covers keyboard keys, e.g. 183 = KEY_F13).
 fn buttonCode(name: []const u8) ?u16 {
-    if (eq(name, "4")) return backend.BTN_SIDE;
-    if (eq(name, "5")) return backend.BTN_EXTRA;
-    return null;
+    if (eq(name, "left")) return lx.BTN_LEFT;
+    if (eq(name, "right")) return lx.BTN_RIGHT;
+    if (eq(name, "middle")) return lx.BTN_MIDDLE;
+    if (eq(name, "4") or eq(name, "side")) return lx.BTN_SIDE;
+    if (eq(name, "5") or eq(name, "extra")) return lx.BTN_EXTRA;
+    if (eq(name, "forward")) return lx.BTN_FORWARD;
+    if (eq(name, "back")) return lx.BTN_BACK;
+    if (eq(name, "task")) return lx.BTN_TASK;
+    return std.fmt.parseInt(u16, name, 10) catch null;
 }
 
 fn parseButtons(cfg: *Config, spec: []const u8) Error!void {
@@ -193,4 +200,35 @@ test "invalid mode errors" {
     const t = std.testing;
     const args = [_][:0]const u8{ "zclicker", "--mode", "spam" };
     try t.expectError(Error.InvalidMode, parse(&args));
+}
+
+test "buttons: aliases and raw codes" {
+    const t = std.testing;
+    {
+        const args = [_][:0]const u8{ "zclicker", "-b", "left,right" };
+        const cfg = try parse(&args);
+        try t.expectEqual(@as(usize, 2), cfg.button_count);
+        try t.expectEqual(lx.BTN_LEFT, cfg.buttons[0]);
+        try t.expectEqual(lx.BTN_RIGHT, cfg.buttons[1]);
+    }
+    {
+        const args = [_][:0]const u8{ "zclicker", "-b", "183" }; // KEY_F13
+        const cfg = try parse(&args);
+        try t.expectEqual(@as(usize, 1), cfg.button_count);
+        try t.expectEqual(@as(u16, 183), cfg.buttons[0]);
+    }
+    {
+        const args = [_][:0]const u8{ "zclicker", "-b", "4,extra,middle" };
+        const cfg = try parse(&args);
+        try t.expectEqual(@as(usize, 3), cfg.button_count);
+        try t.expectEqual(lx.BTN_SIDE, cfg.buttons[0]);
+        try t.expectEqual(lx.BTN_EXTRA, cfg.buttons[1]);
+        try t.expectEqual(lx.BTN_MIDDLE, cfg.buttons[2]);
+    }
+}
+
+test "buttons: invalid token errors" {
+    const t = std.testing;
+    const args = [_][:0]const u8{ "zclicker", "-b", "wat" };
+    try t.expectError(Error.InvalidButton, parse(&args));
 }
