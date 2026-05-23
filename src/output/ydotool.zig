@@ -1,14 +1,15 @@
 const std = @import("std");
-const OutputBackend = @import("../backend.zig").OutputBackend;
+const backend = @import("../backend.zig");
+const OutputBackend = backend.OutputBackend;
 
-/// Output backend that performs a left click by spawning `ydotool click 0xC0`.
-/// 0xC0 = left button down + up in ydotool's hex button encoding
-/// (see `ydotool click --help`). Requires `ydotoold` to be running.
+/// Output backend that clicks the configured button via `ydotool click <hex>`.
+/// Requires `ydotoold` to be running.
 pub const Ydotool = struct {
     io: std.Io,
+    hex: []const u8,
 
-    pub fn init(io: std.Io) Ydotool {
-        return .{ .io = io };
+    pub fn init(io: std.Io, button: backend.ClickButton) Ydotool {
+        return .{ .io = io, .hex = button.ydotoolHex() };
     }
 
     pub fn interface(self: *Ydotool) OutputBackend {
@@ -18,7 +19,7 @@ pub const Ydotool = struct {
     fn clickImpl(ptr: *anyopaque) anyerror!void {
         const self: *Ydotool = @ptrCast(@alignCast(ptr));
         var child = try std.process.spawn(self.io, .{
-            .argv = &[_][]const u8{ "ydotool", "click", "0xC0" },
+            .argv = &[_][]const u8{ "ydotool", "click", self.hex },
             .stdin = .ignore,
             .stdout = .ignore,
             .stderr = .ignore,
